@@ -24,6 +24,21 @@ import pickle
 import h5py
 from sklearn.feature_extraction.image import extract_patches_2d
 
+
+def inner_patch_extractor(array, patch_size, overlap):
+	"""
+	Extract overlapping patches from an array
+	Input:
+	 		array: a numpy array of size (patch_size, N)
+			patch_size: the width & height in pixels of the patch_size
+			overlap: the allowable overlap in pixels between patches
+	"""
+	d = []
+	for i in range(0, p_rows):
+		d.append(x[0:patch_size, :])
+		x = np.delete(x, range(0, (patch_size - overlap)), axis=0)
+
+
 def pixelToCoordinates(geotransform, column, row):
 	"Gets lat lon coordinates from pixel position"
 	x_origin = geotransform[0]
