@@ -8,9 +8,12 @@ socio-economic characteristics from satellite data. You can easily
 modify this code to predict other socio-economic characteristics or use
 other satellite images.
 
+I ran this on [AWS](aws.amazon.com)'s G8 machine. I tried this on a
+mid-2009 MacBookPro and can recommend you don't.
+
 The files of interest are:
- - `cnn\_core.py`: runs the convolutional neural network
- - `database\_constructor.py`: merges satellite images with population
+ - `cnn_core.py`: runs the convolutional neural network
+ - `database_constructor.py`: merges satellite images with population
    databases (shapefiles)
  - `spatial.ipynb`: a worked through example of database construction
  - `ee.ipynb`: downloads LANDSAT 7 TOA images
@@ -20,3 +23,5 @@ This analysis relies on some packages
 - [Google Earth Engine](https://developers.google.com/earth-engine/)
 - [Shapely](toblerity.org/shapely/manual.html)
 - [GeoPandas](geopandas.org/user.html)
+
+
