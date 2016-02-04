@@ -121,7 +121,7 @@ model.add(Activation('linear'))
 # load the weights 
 # note: when there is a complete match between your model definition
 # and your weight savefile, you can simply call model.load_weights(filename)
-model.set_weights('model_weights.hdf5')
+model.load_weights('model_weights.hdf5')
 print('Model loaded.')
 
 
