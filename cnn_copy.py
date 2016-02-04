@@ -121,8 +121,8 @@ model.add(Activation('linear'))
 # load the weights 
 # note: when there is a complete match between your model definition
 # and your weight savefile, you can simply call model.load_weights(filename)
-#model.load_weights('model_weights.h5')
-#print('Model loaded.')
+model.load_weights('model_weights.h5')
+print('Model loaded.')
 
 # setting sgd optimizer parameters
 model.compile(loss='mean_squared_error', optimizer='rmsprop')
