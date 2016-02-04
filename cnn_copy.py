@@ -2,6 +2,7 @@ import matplotlib
 matplotlib.use('Agg')
 import numpy as np
 import h5py
+import pickle
 import matplotlib.pyplot as plt
 from keras.models import Sequential
 from keras.layers.core import Dense, Activation, Dropout, Flatten
@@ -75,6 +76,7 @@ weight_idx = [min(np.searchsorted(bin_val, v, side="left"), clamp_idx) for v in 
 sample_weights = 1.0 / inv_weight[weight_idx]
 
 print 'Creating the model'
+
 # sequential wrapper model
 model = Sequential()
 
@@ -115,8 +117,17 @@ model.add(Dropout(0.5))
 model.add(Dense(1))
 model.add(Activation('linear'))
 
+
+# load the weights 
+# note: when there is a complete match between your model definition
+# and your weight savefile, you can simply call model.load_weights(filename)
+model.set_weights('model_weights.hdf5')
+print('Model loaded.')
+
+
+
 # setting sgd optimizer parameters
-model.compile(loss='mean_squared_error', optimizer='rmsprop')
+model.compile(loss='mean_squared_error', optimizer='adam', lr = 1e-3)
 
 earlystop = callbacks.EarlyStopping(monitor='val_loss', patience = 3, 
     verbose=1, mode='min')
@@ -133,16 +144,18 @@ predicted = model.predict(X_test)
 
 fig, ax = plt.subplots()
 ax.scatter(y_test, predicted) 
-ax.set_xlabel('Actual', fontsize=20)
+ax.set_xlabel('Log normalised population density', fontsize=20)
 ax.set_ylim(0, max(predicted) )
 ax.set_xlim(0, max(y_test))
-ax.set_ylabel('Predicted', fontsize=20)
+ax.set_ylabel('Model prediction', fontsize=20)
 x = np.linspace(0, max(y_test))
-ax.plot(x, x)
+ax.plot(x, x, color='y', linewidth=3)
 plt.savefig('scatter.png')
-
 plt.cla()
 plt.clf()
+
+pickle.dump( predicted, open( "predicted.p", "wb" ) )
+pickle.dump( y_test, open( "y_test.p", "wb" ) )
 
 fix, ax = plt.subplots()
 ax.plot(history.history['loss'], label = 'Training loss')
