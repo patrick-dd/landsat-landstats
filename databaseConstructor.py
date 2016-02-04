@@ -94,58 +94,42 @@ def pointWithinPolygon(idx, points, polygons):
 	return GeoDataFrame(pixelPoint_db)
 
 def satelliteImageToDatabase(sat_folder_loc, state_name, year, channels):
-	print 'Satellite imagery'
+	data = []
 	count = 0
-	tmp_gdf = []
-	for i in range(1,6):
-		print i
-		filename = sat_folder_loc + '/' + state_name + '_50-%d.tif' % i
-		print 'filename done'
+	for extension in channels:
+		filename = sat_folder_loc + state_name + '_' + year + '_' + extension + '.tif'
 		satellite_gdal = gdal.Open(filename)
-		print 'gdal done'		
-		ncols, nrows = satellite_gdal.RasterXSize, satellite_gdal.RasterYSize
-		rows_grid, cols_grid = np.meshgrid(range(0,ncols), range(0,nrows))
-		cols_grid, rows_grid = rows_grid.flatten(), cols_grid.flatten()
-		# getting a series of lat lon points for each pixel
-		print 'meshgrid done'
-		print cols_grid.shape()
-		location_series = [Point(pixelToCoordinates(
-			satellite_gdal.GetGeoTransform(), col, row)) \
-			for (col, row) in zip(cols_grid, rows_grid)]
-		data = []
-		for j in range(1,8):
-			print i, j
-			band = satellite_gdal.GetRasterBand(j)
+		# getting data
+		if extension == 'B1':
+			ncols, nrows = satellite_gdal.RasterXSize, satellite_gdal.RasterYSize
+			rows_grid, cols_grid = np.meshgrid(range(0,ncols), range(0,nrows))
+			cols_grid, rows_grid = rows_grid.flatten(), cols_grid.flatten()
+			# getting a series of lat lon points for each pixel
+			location_series = [Point(pixelToCoordinates(
+				satellite_gdal.GetGeoTransform(), col, row)) \
+				for (col, row) in zip(cols_grid, rows_grid)]
+			# pixel data
+			band = satellite_gdal.GetRasterBand(1)
 			array = band.ReadAsArray()
 			band_series = [array[row][col] for (col, row) in zip(cols_grid, rows_grid)]
-			data_.append(band_series)
-		tmp_gdf = GeoDataFrame({
-			'location': location_series,
-			'B1': data[0],
-			'B2': data[1],
-			'B3': data[2],
-			'B4': data[3],
-			'B5': data[4],
-			'B6_VCID_2': data[5],
-			'B7': data[6],
-			})
-		gdp_list.append(tmp_gdf)
-	#for extension in channels:
-	#	filename = sat_folder_loc + state_name + '_' + year + '_' + extension + '.tif'
-	#	satellite_gdal = gdal.Open(filename)
-		# getting data
-	#	if extension == 'B1':
-						# pixel data
-	#		band = satellite_gdal.GetRasterBand(1)
-	#		array = band.ReadAsArray()
-	#		band_series = [array[row][col] for (col, row) in zip(cols_grid, rows_grid)]
-	#		data.append(band_series)
-	#	else:
-	#		band = satellite_gdal.GetRasterBand(1)
-	#		array = band.ReadAsArray()
-	#		band_series = np.array([array[row][col] for (col, row) in zip(cols_grid, rows_grid)])
-	#		data.append(band_series)
-	db_image = GeoDataFrame( pd.concat(gpd_list, ignore_index=True) )
+			data.append(band_series)
+		else:
+			band = satellite_gdal.GetRasterBand(1)
+			array = band.ReadAsArray()
+			band_series = np.array([array[row][col] for (col, row) in zip(cols_grid, rows_grid)])
+			data.append(band_series)
+
+	db_image = GeoDataFrame({
+		'location': location_series,
+		'B1': data[0],
+		'B2': data[1],
+		'B3': data[2],
+		'B4': data[3],
+		'B5': data[4],
+		'B6_VCID_2': data[5],
+		'B7': data[6],
+		})
+	print np.array(data).shape
 	return db_image, satellite_gdal, data
 
 def urbanDatabase(urban_folder_loc, state_code):
@@ -176,9 +160,9 @@ def sampling(sampling_rate, obs_size, satellite_gdal, db_image):
 	urban_array = db_image['urban'].fillna(0)
 	urban_array = np.array(urban_array).reshape((nrows, ncols))
 	urban_data = []
-	for i in range(0, nrows - obs_size, 1):
+	for i in range(0, nrows - obs_size, 10):
 		j = 0
-		for j in range(0, ncols - obs_size, 1):
+		for j in range(0, ncols - obs_size, 10):
 			urb_px = urban_array[i : i + obs_size, j : j + obs_size].sum()
 			urban_data.append(urb_px)
 	urban_data = pd.DataFrame(urban_data)
@@ -187,10 +171,11 @@ def sampling(sampling_rate, obs_size, satellite_gdal, db_image):
 	urban_rank = urban_data[0].rank(ascending=False)
 	urban_data['rank'] = urban_rank
 	sumrank = urban_data['rank'].sum()
-	urban_data['weight'] = (urban_data['rank']**20) / sumrank
+	urban_data['weight'] = (urban_data['rank']) / sumrank
+	
 	urban_sample = urban_data[0].sample(
 			int(len(urban_data[0]) * sampling_rate), 
-			weights=urban_data['weight'], replace=True)
+			weights=sample_weights, replace=True)
 	urban_sample_idx = np.array(urban_sample.index.values)
 	urban_sample_idx.sort()
 	print 'sample size ', len(urban_sample_idx)
