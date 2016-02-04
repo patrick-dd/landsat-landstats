@@ -10,6 +10,7 @@ from keras.layers.convolutional import Convolution2D, MaxPooling2D
 from keras.utils import np_utils
 from keras import callbacks
 from keras.layers import advanced_activations
+from keras.optimizers import Adam
 
 obs_size = 64
 
@@ -125,7 +126,8 @@ model.load_weights('model_weights.h5')
 print('Model loaded.')
 
 # setting sgd optimizer parameters
-model.compile(loss='mean_squared_error', optimizer='rmsprop')
+adam = Adam(lr = 1e-5, beta_1 = 0.9, beta_2 = 0.999, epsilon = 1e-8)
+model.compile(loss='mean_squared_error', optimizer=adam)
 
 earlystop = callbacks.EarlyStopping(monitor='val_loss', patience = 3, 
     verbose=1, mode='min')

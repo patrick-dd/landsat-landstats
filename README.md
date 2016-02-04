@@ -3,7 +3,7 @@
 You can use the files in this repository to predict population from
 LANDSAT7 images.
 
-At it's core, this is a supervised learning model to predict
+LANDSAT lanstats is a supervised learning model to predict
 socio-economic characteristics from satellite data. You can easily
 modify this code to predict other socio-economic characteristics or use
 other satellite images.
