@@ -1,6 +1,6 @@
 ## Creating a database!
 
-from databaseConstructor import *
+from output_databaseConstructor import *
 
 ## Number 53 for Washington
 ## Number 41 for Oregon
@@ -14,7 +14,7 @@ census_folder_loc = state_name + '_block_data/'
 save_folder_loc = 'keras_data/output/'
 
 # a file size of 10 ~ 1mb
-file_size = 2048
+file_size = 1024
 obs_size = 64
 
 databaseConstruction(sat_folder_loc, save_folder_loc, state_name, state_code, year, channels, file_size, 

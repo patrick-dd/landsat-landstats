@@ -103,35 +103,38 @@ def satelliteImageToDatabase(sat_folder_loc, state_name, year, channels):
 		# getting data
 		if extension == 'B1':
 			ncols, nrows = satellite_gdal.RasterXSize, satellite_gdal.RasterYSize
-			cols_grid, cols_grid = np.meshgrid(range(0,ncols), range(0,nrows))
+			cols_grid, rows_grid = np.meshgrid(range(0,ncols), range(0,nrows))
 			rows_grid, cols_grid = rows_grid.flatten(), cols_grid.flatten()
 			# getting a series of lat lon points for each pixel
 			location_series = [Point(pixelToCoordinates(
 				satellite_gdal.GetGeoTransform(), col, row)) \
 				for (col, row) in zip(cols_grid, rows_grid)]
-			location_series = np.array(location_series).reshape((nrows, ncols))
+			#location_series = np.array(location_series).reshape((nrows, ncols))
 			# pixel data
 			band = satellite_gdal.GetRasterBand(1)
 			array = band.ReadAsArray()
 			band_series = [array[row][col] for (col, row) in zip(cols_grid, rows_grid)]
+			band_series = np.array(band_series).reshape((nrows, ncols))
 			data.append(band_series)
 		else:
 			band = satellite_gdal.GetRasterBand(1)
 			array = band.ReadAsArray()
 			band_series = np.array([array[row][col] for (col, row) in zip(cols_grid, rows_grid)])
+			band_series = np.array(band_series).reshape((nrows, ncols))
 			data.append(band_series)
-	return location_series, data
+	return location_series, np.array(data)
 
 def sampleGenerator(obs_size, location_series, data):
 	print 'Creates the Keras ready sample'
 	output_data_full = []
 	tmp_data = []
 	for i in range(0, 7):
-		output_data_full.append(extract_patches_2d(image_array[i,:,:], (obs_size, obs_size)))
+		output_data_full.append(extract_patches_2d(data[i,:,:], (obs_size, obs_size)))
 	output_data_full = np.array(output_data_full)
+	output_data_full = np.swapaxes(output_data_full, 0, 1)
 	print 'Shapes of full output data', output_data_full.shape
-	location_data_full =  extract_patches_2d(location_series, (obs_size, obs_size))
-	return output_data_full, location_data_full
+	#location_data_full =  extract_patches_2d(location_series, (obs_size, obs_size))
+	return output_data_full #, location_data_full
 
 def saveFiles_X(X, file_size, save_folder_loc, state_name):
 	print 'Saving files'
@@ -167,6 +170,6 @@ def databaseConstruction(sat_folder_loc, save_folder_loc, state_name, state_code
 		obs_size):
 	print 'Constructing output database'
 	location_series, data = satelliteImageToDatabase(sat_folder_loc, state_name, year, channels)
-	image_data, location_data_full = sampleGenerator(obs_size, location_series, data)
+	image_data = sampleGenerator(obs_size, location_series, data)
 	saveFiles_X(image_data, file_size, save_folder_loc, state_name)
-	saveFiles_y(location_data_full, file_size, save_folder_loc, state_name)
+	#saveFiles_y(location_data_full, file_size, save_folder_loc, state_name)
