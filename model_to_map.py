@@ -114,7 +114,7 @@ def get_estimates_loop(image, cols_grid, rows_grid, nrows, ncols, buffer_size):
 		estimates = run_model(patches)
 		pixel_estimate = np.mean(estimates)
 		estimates_array.append(pixel_estimate)
-	return estimates_array
+	return np.array(estimates_array)
 
 
 sat_folder_loc = 'LANDSAT_TOA/Washington/'
@@ -122,12 +122,20 @@ state_name = 'Washington'
 year = '2010'
 channels = ['B1', 'B2', 'B3', 'B4', 'B5', 'B6_VCID_2', 'B7']
 buffer_size = 3
-a, satellite_gdal, image, cols_grid, rows_grid = satelliteImageToDatabase(
+db, satellite_gdal, image, cols_grid, rows_grid = satelliteImageToDatabase(
 					sat_folder_loc, state_name, year, channels)
 ests = get_estimates_loop(np.array(image), cols_grid, rows_grid, satellite_gdal.RasterYSize, 
 					satellite_gdal.RasterXSize, buffer_size)
 
-pickle.dump(ests, open('pixel_ests.p', 'w') )
+
+print 'Database shape', db.shape
+print 'Estimates shape', ests.shape
+db['density_estimates'] = ests
+print ''
+print 'Database head'
+db.head()
+
+pickle.dump(db, open('database_with_estimates.p', 'w') )
 
 
 	
