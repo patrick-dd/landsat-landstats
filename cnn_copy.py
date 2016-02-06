@@ -24,7 +24,7 @@ f = h5py.File('keras_data/db_Oregon_y_0.hdf5', 'r')
 y_train = np.array(f['data'])
 f.close()
 
-for i in range(1,35):
+for i in range(1,30):
     f = h5py.File('keras_data/db_Oregon_X_%d.hdf5' % i, 'r')
     X_train = np.vstack((X_train, np.array(f['data'])))
     f.close()
@@ -40,7 +40,7 @@ f = h5py.File('keras_data/db_Washington_y_0.hdf5', 'r')
 y_test = np.array(f['data'])
 f.close()
 
-for i in range(1,26):
+for i in range(1,25):
     f = h5py.File('keras_data/db_Washington_X_%d.hdf5' % i, 'r')
     X_test = np.vstack((X_test, np.array(f['data'])))
     f.close()
@@ -143,7 +143,7 @@ score = model.evaluate(X_test, y_test, batch_size=128)
 predicted = model.predict(X_test)  
 
 fig, ax = plt.subplots()
-ax.scatter(y_test, predicted) 
+ax.scatter(y_test, predicted, marker = 'o') 
 ax.set_xlabel('Log normalised population density', fontsize=20)
 ax.set_ylim(0, max(predicted) )
 ax.set_xlim(0, max(y_test))

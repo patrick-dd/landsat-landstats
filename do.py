@@ -17,7 +17,7 @@ save_folder_loc = 'keras_data/'
 
 # a file size of 10 ~ 1mb
 file_size = 2048
-sample_rate = 0.05
+sample_rate = 0.25
 obs_size = 64
 
 databaseConstruction(census_folder_loc, census_shapefile, urban_folder_loc,
