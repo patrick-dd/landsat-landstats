@@ -20,7 +20,7 @@ from rtree import index
 from geopandas import GeoDataFrame
 from functools import partial
 import pyproj
-import pickle
+import cPickle
 import h5py
 from sklearn.feature_extraction.image import extract_patches_2d
 
@@ -157,29 +157,33 @@ def sampling(sampling_rate, obs_size, satellite_gdal, db_image):
 	print 'Sampling the database'
 	nrows, ncols = satellite_gdal.RasterYSize, satellite_gdal.RasterXSize
 	nobs = (nrows - obs_size) * (ncols - obs_size)
+	# Getting the sum of urban pixels for each patch
 	urban_array = db_image['urban'].fillna(0)
 	urban_array = np.array(urban_array).reshape((nrows, ncols))
-	urban_data = []
-	for i in range(0, nrows - obs_size, 10):
-		j = 0
-		for j in range(0, ncols - obs_size, 10):
-			urb_px = urban_array[i : i + obs_size, j : j + obs_size].sum()
-			urban_data.append(urb_px)
+	urban_patches = extract_patches_2d(data_array, (obs_size, obs_size))
+	urban_data = [np.sum(patch) for patch in urban_patches]
 	urban_data = pd.DataFrame(urban_data)
-	# Creating buckets -- 
+	# adding lat, long
+	urban_data['latitude'] =  db_image['latitude']
+	urban_data['longitude'] =  db_image['longitude']
+	# Creating sample weights 
 	seed = 1996
 	urban_rank = urban_data[0].rank(ascending=False)
 	urban_data['rank'] = urban_rank
 	sumrank = urban_data['rank'].sum()
 	urban_data['weight'] = (urban_data['rank']) / sumrank
-	
 	urban_sample = urban_data[0].sample(
 			int(len(urban_data[0]) * sampling_rate), 
 			weights=sample_weights, replace=True)
 	urban_sample_idx = np.array(urban_sample.index.values)
+	urban_data['sample'] = urban_sample_idx
 	urban_sample_idx.sort()
 	print 'sample size ', len(urban_sample_idx)
-	return urban_sample_idx
+	# adding sample indicator variable
+	urban_data['sample'] = urban_sample
+	urban_data.ix[urban_data['sample'] > 0, 'sample'] = 1
+	urban_data.fillna(0)
+	return urban_sample_idx, urban_data
 
 def censusDatabase(census_folder_loc, census_shapefile):
 	print 'Getting density'
@@ -297,10 +301,14 @@ def databaseConstruction(census_folder_loc, census_shapefile, urban_folder_loc,
 	print db_image.head()
 	db_urban = urbanDatabase(urban_folder_loc, state_code)
 	db_image = satUrbanDatabase(db_urban, db_image)
-	urban_sample_idx = sampling(sample_rate, obs_size, satellite_gdal, db_image)
+	urban_sample_idx, knn_data = sampling(sample_rate, obs_size, satellite_gdal, db_image)
+	cPickle.dump(knn_data, file('knn_X_data.save', 'wb'), protocol=cPickle.HIGHEST_PROTOCOL)
 	db_shape = censusDatabase(census_folder_loc, census_shapefile)
 	db_image = mergeCensusSatellite(db_shape, db_image)
 	X, y = sampleGenerator(obs_size, db_image, channels, 
 						satellite_gdal, urban_sample_idx)
 	saveFiles_y(y, file_size, save_folder_loc, state_name)
 	saveFiles_X(X, file_size, save_folder_loc, state_name)
+
+
+
