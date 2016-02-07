@@ -39,13 +39,17 @@ from databaseConstructor import pixelToCoordinates
 y_pred = np.array(cPickle.load(file('output_predictions.save', 'rb')))
 
 # load X values
-df_train = 
+df_train = cPickle.load(file('knn_X_data.save', 'rb'))
+print df_train.head()
+
+print df_train['weight'].unique()
+
 lat = df_train['latitude']
 lon = df_train['longitude']
 X_train = [(latitude, longitude) for (latitude, longitude) in zip(lat, lon)]
 
 # getting size of image file
-filename = 'LANDSAT_TOA/Washington/washington_b1.tif'
+filename = 'LANDSAT_TOA/Washington/Washington_2010_B1.tif'
 satellite_gdal = gdal.Open(filename)
 ncols, nrows = satellite_gdal.RasterXSize, satellite_gdal.RasterYSize
 ncols, nrows = 10, 10
@@ -56,12 +60,12 @@ location_series = [Point(pixelToCoordinates(satellite_gdal.GetGeoTransform(), co
 
 coordinates = [ (point.y, point.x) for point in location_series]
 
-output = 
-
+print np.array(X_train).shape, np.array(y_pred).shape
 
 n_neighbors = 10
 knn = neighbors.KNeighborsRegressor(n_neighbors, weights='distance')
-y_ = knn.fit(X_train, y_pred).predict(coordinates)
+y_interpolated = knn.fit(X_train, y_pred).predict(coordinates)
 
-
+cPickle.dump(y_interpolated, file('y_interpolated', 'wb'), protocol=
+			cPickle.HIGHEST_PROTOCOL)
 
