@@ -176,7 +176,9 @@ def sampling(sampling_rate, obs_size, satellite_gdal, db_image):
 			int(len(urban_data[0]) * sampling_rate), 
 			weights=urban_data['weight'], replace=True)
 	urban_sample_idx = np.array(urban_sample.index.values)
-	urban_data.ix[urban_sample_idx]
+	print 'Shape of urban_sample', urban_sample.shape
+	urban_data = urban_data.ix[urban_sample_idx]
+	print 'Shape of urban_sample post sample', urban_sample.shape
 	urban_sample_idx.sort()
 	print 'sample size ', len(urban_sample_idx)
 	return urban_sample_idx, urban_data

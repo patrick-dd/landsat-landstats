@@ -50,8 +50,8 @@ ncols, nrows = satellite_gdal.RasterXSize, satellite_gdal.RasterYSize
 
 # chopping up the grid into overlapping ranges
 # columns
-batch_size = 1500
-overlap = 350
+batch_size = 500
+overlap = 50
 batch_size_less_olap = batch_size - overlap
 col_regions = ncols / batch_size_less_olap + 1
 col_slice_lower = [batch_size_less_olap * x for x in np.arange(col_regions)]
@@ -86,6 +86,9 @@ for i in np.arange(len(row_slice_upper)):
 		print y_interpolated
 		cPickle.dump(y_interpolated, file('y_interpolated_%d.save' % count, 
 					'wb'), protocol= cPickle.HIGHEST_PROTOCOL)
+		cPickle.dump(tmp_location_series, file('location_%d.save' % count, 
+					'wb'), protocol= cPickle.HIGHEST_PROTOCOL)
 		count += 1
+        break
 
 
