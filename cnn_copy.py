@@ -12,7 +12,7 @@ from keras import callbacks
 from keras.layers import advanced_activations
 from keras.optimizers import Adam
 
-obs_size = 64
+obs_size = 64 
 
 print('Reading data')
 
@@ -24,13 +24,13 @@ f = h5py.File('keras_data/db_Oregon_y_0.hdf5', 'r')
 y_train = np.array(f['data'])
 f.close()
 
-for i in range(1,30):
-    f = h5py.File('keras_data/db_Oregon_X_%d.hdf5' % i, 'r')
-    X_train = np.vstack((X_train, np.array(f['data'])))
-    f.close()
-    f = h5py.File('keras_data/db_Oregon_y_%d.hdf5' % i, 'r')
-    y_train = np.hstack((y_train, f['data']))
-    f.close()
+for i in range(1,35):
+	f = h5py.File('keras_data/db_Oregon_X_%d.hdf5' % i, 'r')
+	X_train = np.vstack((X_train, np.array(f['data'])))
+	f.close()
+	f = h5py.File('keras_data/db_Oregon_y_%d.hdf5' % i, 'r')
+	y_train = np.hstack((y_train, f['data']))
+	f.close()
 
 ## Initialising with value 0
 f = h5py.File('keras_data/db_Washington_X_0.hdf5', 'r')
@@ -40,13 +40,13 @@ f = h5py.File('keras_data/db_Washington_y_0.hdf5', 'r')
 y_test = np.array(f['data'])
 f.close()
 
-for i in range(1,25):
-    f = h5py.File('keras_data/db_Washington_X_%d.hdf5' % i, 'r')
-    X_test = np.vstack((X_test, np.array(f['data'])))
-    f.close()
-    f = h5py.File('keras_data/db_Washington_y_%d.hdf5' % i, 'r')
-    y_test = np.hstack((y_test, f['data']))
-    f.close()
+for i in range(1,26):
+	f = h5py.File('keras_data/db_Washington_X_%d.hdf5' % i, 'r')
+	X_test = np.vstack((X_test, np.array(f['data'])))
+	f.close()
+	f = h5py.File('keras_data/db_Washington_y_%d.hdf5' % i, 'r')
+	y_test = np.hstack((y_test, f['data']))
+	f.close()
 
 # mean normalisation
 mean_value = np.mean(X_train)
@@ -83,8 +83,8 @@ model = Sequential()
 
 # first convolutional pair
 model.add(Convolution2D(32, 5, 5, 
-            border_mode='valid',
-            input_shape = (7, obs_size, obs_size)))
+			border_mode='valid',
+			input_shape = (7, obs_size, obs_size)))
 model.add(Activation('relu'))
 model.add(Convolution2D(32, 5, 5))
 model.add(MaxPooling2D(pool_size=(2, 2)))
@@ -126,18 +126,18 @@ model.load_weights('model_weights.h5')
 print('Model loaded.')
 
 # setting sgd optimizer parameters
-adam = Adam(lr = 1e-5, beta_1 = 0.9, beta_2 = 0.999, epsilon = 1e-8)
+adam = Adam(lr = 1e-6, beta_1 = 0.9, beta_2 = 0.999, epsilon = 1e-8)
 model.compile(loss='mean_squared_error', optimizer=adam)
 
 earlystop = callbacks.EarlyStopping(monitor='val_loss', patience = 3, 
-    verbose=1, mode='min')
+	verbose=1, mode='min')
 checkpoint = callbacks.ModelCheckpoint('/tmp/weights.hdf5', 
-    monitor='val_loss', verbose=1, save_best_only=True, mode='auto')
+	monitor='val_loss', verbose=1, save_best_only=True, mode='auto')
 history = callbacks.History()
 
 print("Starting training")
 model.fit(X_train, y_train, batch_size=128, validation_split=0.15, sample_weight=sample_weights,
-        show_accuracy=False, callbacks = [earlystop, checkpoint, history])
+		show_accuracy=False, callbacks = [earlystop, checkpoint, history])
 print("Evaluating")
 score = model.evaluate(X_test, y_test, batch_size=128)
 predicted = model.predict(X_test)  
@@ -173,4 +173,4 @@ print history.history
 # save as JSON
 json_string = model.to_json()
 # save model weights
-model.save_weights('model_weights.h5', overwrite=True)
+model.save_weights('model_weights_sml.h5', overwrite=True)

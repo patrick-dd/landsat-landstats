@@ -96,13 +96,16 @@ def pointWithinPolygon(idx, points, polygons):
 def satelliteImageToDatabase(sat_folder_loc, state_name, year, channels):
 	data = []
 	count = 0
+	print 'Getting satellite image'
 	for extension in channels:
 		filename = sat_folder_loc + state_name + '_' + year + '_' + extension + '.tif'
 		satellite_gdal = gdal.Open(filename)
 		# getting data
 		if extension == 'B1':
+			print extension
 			ncols, nrows = satellite_gdal.RasterXSize, satellite_gdal.RasterYSize
 			rows_grid, cols_grid = np.meshgrid(range(0,ncols), range(0,nrows))
+			print rows_grid.shape
 			cols_grid, rows_grid = rows_grid.flatten(), cols_grid.flatten()
 			# getting a series of lat lon points for each pixel
 			location_series = [Point(pixelToCoordinates(
@@ -110,10 +113,12 @@ def satelliteImageToDatabase(sat_folder_loc, state_name, year, channels):
 				for (col, row) in zip(cols_grid, rows_grid)]
 			# pixel data
 			band = satellite_gdal.GetRasterBand(1)
+			print band
 			array = band.ReadAsArray()
 			band_series = [array[row][col] for (col, row) in zip(cols_grid, rows_grid)]
 			data.append(band_series)
 		else:
+			print extension
 			band = satellite_gdal.GetRasterBand(1)
 			array = band.ReadAsArray()
 			band_series = np.array([array[row][col] for (col, row) in zip(cols_grid, rows_grid)])
@@ -301,12 +306,12 @@ def databaseConstruction(census_folder_loc, census_shapefile, urban_folder_loc,
 	db_image = satUrbanDatabase(db_urban, db_image)
 	urban_sample_idx, knn_data = sampling(sample_rate, obs_size, satellite_gdal, db_image)
 	cPickle.dump(knn_data, file('knn_X_data.save', 'wb'), protocol=cPickle.HIGHEST_PROTOCOL)
-	#db_shape = censusDatabase(census_folder_loc, census_shapefile)
-	#db_image = mergeCensusSatellite(db_shape, db_image)
-	#X, y = sampleGenerator(obs_size, db_image, channels, 
-	#					satellite_gdal, urban_sample_idx)
-	#saveFiles_y(y, file_size, save_folder_loc, state_name)
-	#saveFiles_X(X, file_size, save_folder_loc, state_name)
+	db_shape = censusDatabase(census_folder_loc, census_shapefile)
+	db_image = mergeCensusSatellite(db_shape, db_image)
+	X, y = sampleGenerator(obs_size, db_image, channels, 
+						satellite_gdal, urban_sample_idx)
+	saveFiles_y(y, file_size, save_folder_loc, state_name)
+	saveFiles_X(X, file_size, save_folder_loc, state_name)
 
 
 
