@@ -49,7 +49,7 @@ lon = df_train['longitude']
 X_train = [(latitude, longitude) for (latitude, longitude) in zip(lat, lon)]
 
 # getting size of image file
-filename = 'LANDSAT_TOA/Washington/Washington_2010_B1.tif'
+filename = 'LANDSAT_TOA/Washington/washington_2010_B1.tif'
 satellite_gdal = gdal.Open(filename)
 ncols, nrows = satellite_gdal.RasterXSize, satellite_gdal.RasterYSize
 ncols, nrows = 10, 10
