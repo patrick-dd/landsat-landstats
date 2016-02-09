@@ -76,6 +76,19 @@ clamp_idx = len(inv_weight) - 1
 weight_idx = [min(np.searchsorted(bin_val, v, side="left"), clamp_idx) for v in y_train]
 sample_weights = 1.0 / inv_weight[weight_idx]
 
+def un_normalise(y_in, max_train):
+	"""
+	Unnormalises the output
+	Inputs:
+		y_in: numpy array of normalised estimates
+		max_train: maximum value of y post logarithm
+	Returns:
+		y_out: numpy array of un normalised values
+	"""
+	y_in *= max_train
+	y_out = [ (10**y - 1) for y in y_in ]
+	return np.array(y_out)
+
 print 'Creating the model'
 
 # sequential wrapper model
@@ -154,8 +167,14 @@ plt.savefig('scatter.png')
 plt.cla()
 plt.clf()
 
-pickle.dump( predicted, open( "predicted.p", "wb" ) )
-pickle.dump( y_test, open( "y_test.p", "wb" ) )
+pickle.dump( predicted, open( "predicted_normalised.p", "wb" ) )
+pickle.dump( y_test, open( "y_normalised.p", "wb" ) )
+pickle.dump( max_train, open( "max_train.p", "wb" ) )
+
+y_unnorm = un_normalise(y_in, max_train)
+pred_unnorm = un_normalise(predicted, max_train)
+pickle.dump( predicted, open( "predicted_unnormalised.p", "wb" ) )
+pickle.dump( y_test, open( "y_unnormalised.p", "wb" ) )
 
 fix, ax = plt.subplots()
 ax.plot(history.history['loss'], label = 'Training loss')
@@ -165,7 +184,11 @@ ax.set_ylabel('RMSE (people per km$^2$)', fontsize=20)
 plt.legend()
 plt.savefig('loss.png')
 
-# plot(model, to_file='model_architecture.png')
+plot(model, to_file='model_architecture.png')
+
+
+
+
 
 print 'Printing History'
 print history.history
@@ -173,4 +196,4 @@ print history.history
 # save as JSON
 json_string = model.to_json()
 # save model weights
-model.save_weights('model_weights_sml.h5', overwrite=True)
+model.save_weights('model_weights.h5', overwrite=True)
