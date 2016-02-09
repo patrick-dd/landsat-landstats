@@ -400,16 +400,24 @@ def databaseConstruction(census_folder_loc, census_shapefile, urban_folder_loc,
 	Returns:
 		Data for you to play with  :)
 	"""
+	print 'Collecting satellite data'
 	df_image, nrows, ncols = satelliteImageToDatabase(sat_folder_loc, state_name, year, channels)
+	print 'Organising urban data'
 	df_urban = urbanDatabase(urban_folder_loc, state_code)
+	print 'Combining dataframes'
 	df_image = satUrbanDatabase(df_urban, df_image)
+	print 'Sampling'
 	urban_sample_idx, knn_data = sampling(sample_rate, obs_size, nrows, ncols, df_image)
 	cPickle.dump(knn_data, file('knn_X_data.save', 'wb'), protocol=cPickle.HIGHEST_PROTOCOL)
+	print 'Collecting census data'
 	df_census = censusDatabase(census_folder_loc, census_shapefile)
+	print 'Merging dataframes'
 	df_image = mergeCensusSatellite(df_census, df_image)
+	print 'Creating samples for Keras'
 	X, y = sampleGenerator(obs_size, df_image, channels, nrows, ncols, urban_sample_idx)
+	print 'Saving files'
 	saveFiles_y(y, file_size, save_folder_loc, state_name)
 	saveFiles_X(X, file_size, save_folder_loc, state_name)
-
+	print 'Job done!'
 
 
