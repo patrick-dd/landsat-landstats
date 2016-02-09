@@ -120,16 +120,13 @@ def satelliteImageToDatabase(sat_folder_loc, state_name, year, channels):
 	"""
 	data = []
 	count = 0
-	print 'Getting satellite image'
 	for extension in channels:
 		filename = sat_folder_loc + state_name + '_' + year + '_' + extension + '.tif'
 		satellite_gdal = gdal.Open(filename)
 		# getting data
 		if extension == 'B1':
-			print extension
 			ncols, nrows = satellite_gdal.RasterXSize, satellite_gdal.RasterYSize
 			rows_grid, cols_grid = np.meshgrid(range(0,ncols), range(0,nrows))
-			print rows_grid.shape
 			cols_grid, rows_grid = rows_grid.flatten(), cols_grid.flatten()
 			# getting a series of lat lon points for each pixel
 			location_series = [Point(pixelToCoordinates(
@@ -137,13 +134,11 @@ def satelliteImageToDatabase(sat_folder_loc, state_name, year, channels):
 				for (col, row) in zip(cols_grid, rows_grid)]
 			# pixel data
 			band = satellite_gdal.GetRasterBand(1)
-			print band
 			array = band.ReadAsArray()
 			band_series = [array[row][col] for (col, row) in zip(cols_grid, rows_grid)]
 			data.append(band_series)
 		else:
-			print extension
-			band =df_image satellite_gdal.GetRasterBand(1)
+			band = satellite_gdal.GetRasterBand(1)
 			array = band.ReadAsArray()
 			band_series = np.array([array[row][col] for (col, row) in zip(cols_grid, rows_grid)])
 			data.append(band_series)
