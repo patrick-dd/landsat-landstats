@@ -18,10 +18,13 @@ The files of interest are:
  - `spatial.ipynb`: a worked through example of database construction
  - `ee.ipynb`: downloads LANDSAT 7 TOA images
 
-This analysis relies on some packages 
+In addition to the usual, the analysis relies on these packages 
 - [Keras](keras.io)
 - [Google Earth Engine](https://developers.google.com/earth-engine/)
 - [Shapely](toblerity.org/shapely/manual.html)
 - [GeoPandas](geopandas.org/user.html)
+- [Rtree](toblerity.org/rtree)
+
+You can download satellite image data through the [Google Earth Engine](https://developers.google.com/earth-engine). You can download Census, Urban and County data via the Census' [website](census.gov/geo/maps-data/data/tiger-data).
 
 
