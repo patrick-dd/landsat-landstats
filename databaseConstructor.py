@@ -152,7 +152,7 @@ def satelliteImageToDatabase(sat_folder_loc, state_name, year, channels):
 		'B6_VCID_2': data[5],
 		'B7': data[6],
 		})
-	return df_image, nrows, ncols
+	return df_image, nrows, ncols, satellite_gdal
 
 def urbanDatabase(urban_folder_loc, state_code):
 	"""
@@ -187,7 +187,7 @@ def satUrbanDatabase(df_urban, df_image):
 	df_image['longitude_u'] = pixelPoint_urban['longitude']
 	return df_image
 
-def sampling(sampling_rate, obs_size, nrows, ncols, df_image):
+def sampling(sampling_rate, obs_size, nrows, ncols, df_image, satellite_gdal):
 	"""
 	Constructs a weighted sample of images from the GeoDataFrame
 	Inputs:
@@ -209,6 +209,16 @@ def sampling(sampling_rate, obs_size, nrows, ncols, df_image):
 	indices = np.arange(nrows*ncols).reshape((nrows, ncols))
 	indices = indices[ : -obs_size + 1, : -obs_size + 1 ]
 	df_sample['index'] = df_sample.ravel()
+	# Getting the locations
+	mid_point = obs_size / 2
+	cols_grid, rows_grid = np.meshgrid( 
+							range(mid_point, mid_point + ncols - obs_size + 1), 
+							range(mid_point, mid_point + nrows - obs_size + 1))
+	rows_grid, cols_grid = rows_grid.ravel(), cols_grid.ravel()
+	location_series = [Point(pixelToCoordinates(
+				satellite_gdal.GetGeoTransform(), col, row)) \
+				for (col, row) in zip(cols_grid, rows_grid)]
+	df_sample['location'] = location_series
 	# Creating sample weights 
 	seed = 1996
 	urban_rank = df_sample[0].rank(ascending=False)
@@ -401,13 +411,15 @@ def databaseConstruction(census_folder_loc, census_shapefile, urban_folder_loc,
 		Data for you to play with  :)
 	"""
 	print 'Collecting satellite data'
-	df_image, nrows, ncols = satelliteImageToDatabase(sat_folder_loc, state_name, year, channels)
+	df_image, nrows, ncols, satellite_gdal = \
+				satelliteImageToDatabase(sat_folder_loc, state_name, year, channels)
 	print 'Organising urban data'
 	df_urban = urbanDatabase(urban_folder_loc, state_code)
 	print 'Combining dataframes'
 	df_image = satUrbanDatabase(df_urban, df_image)
 	print 'Sampling'
-	urban_sample_idx, knn_data = sampling(sample_rate, obs_size, nrows, ncols, df_image)
+	urban_sample_idx, knn_data = sampling(sample_rate, obs_size, nrows, ncols, 
+											df_image, satellite_gdal)
 	cPickle.dump(knn_data, file('knn_X_data.save', 'wb'), protocol=cPickle.HIGHEST_PROTOCOL)
 	print 'Collecting census data'
 	df_census = censusDatabase(census_folder_loc, census_shapefile)
