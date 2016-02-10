@@ -29,6 +29,8 @@ import cPickle
 import pickle
 import h5py
 from sklearn import neighbors
+from sklearn.cross_validation import KFold
+from sklearn.metrics import mean_squared_error
 from databaseConstructor import pixelToCoordinates
 
 # loading predictions
@@ -51,18 +53,41 @@ rows_grid=rows_grid.ravel()
 location_series = [Point(pixelToCoordinates(
 				satellite_gdal.GetGeoTransform(), col, row)) \
 				for (col, row) in zip(cols_grid, rows_grid)]
-coordinates = [ (point.x, point.y) for point in location_series]
+coordinates = [ (point.y, point.x) for point in location_series]
+
 	
 # chopping up the grid into overlapping ranges
-n_neighbors = 5
-knn = neighbors.KNeighborsRegressor(n_neighbors, weights='distance')
-model = knn.fit(X_train, y_pred)
-y_interpolated = model.predict(coordinates)
+kf = KFold(len(X_train), n_folds=10, shuffle=True, random_state=None)
+X_train = np.array(X_train)
+y_pred = y_pred
+
+n_neighbours = 10
+best_neighbours = 1
+score = 10
+for train_index, test_index in kf:
+	print len(y_pred), y_pred[0]
+	X_train_tmp = X_train[train_index, ]
+	y_train_tmp = y_pred[train_index]
+	X_test_tmp = X_train[test_index, ]
+	y_test_tmp = y_pred[test_index]
+	knn = neighbors.KNeighborsRegressor(n_neighbours, weights='uniform')
+	model = knn.fit(X_train_tmp, y_train_tmp)
+	y_pred_tmp = model.predict(X_test_tmp)
+	tmp_score = mean_squared_error(y_test_tmp, y_pred_tmp)
+	print 'Number neighbours', n_neighbours
+	print 'RMSE', tmp_score
+	if tmp_score < score:
+		score = tmp_score
+		best_neighbours = n_neighbours
+		y_interpolated = model.predict(coordinates)
+	n_neighbours += 10
+
+print 'Optimal number of neighbours', best_neighbours
+
 cPickle.dump(y_interpolated, file('mapping/y_interpolated.save', 
 			'wb'), protocol= cPickle.HIGHEST_PROTOCOL)
 cPickle.dump(location_series, file('mapping/location.save', 
 			'wb'), protocol= cPickle.HIGHEST_PROTOCOL)
-
 
 
 """
