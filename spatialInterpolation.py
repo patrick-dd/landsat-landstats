@@ -36,9 +36,9 @@ y_pred = np.array(pickle.load(file('predicted_normalised.p', 'rb')))
 print min(y_pred), max(y_pred)
 # load X values
 df_train = cPickle.load(file('knn_X_data.save', 'rb'))
-print df_train.head()
-lat = df_train['latitude']
-lon = df_train['longitude']
+location = df_train['location']
+lat = [l.y for l in location]
+lon = [l.x for l in location] 
 X_train = [(latitude, longitude) for (latitude, longitude) in zip(lat, lon)]
 print y_pred.shape, np.array(X_train).shape
 # getting size of image file

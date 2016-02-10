@@ -12,7 +12,7 @@ from keras import callbacks
 from keras.layers import advanced_activations
 from keras.optimizers import Adam
 
-obs_size = 64 
+obs_size = 32
 
 print('Reading data')
 
@@ -24,7 +24,7 @@ f = h5py.File('keras_data/db_Oregon_y_0.hdf5', 'r')
 y_train = np.array(f['data'])
 f.close()
 
-for i in range(1,35):
+for i in range(1,39):
 	f = h5py.File('keras_data/db_Oregon_X_%d.hdf5' % i, 'r')
 	X_train = np.vstack((X_train, np.array(f['data'])))
 	f.close()
@@ -40,7 +40,7 @@ f = h5py.File('keras_data/db_Washington_y_0.hdf5', 'r')
 y_test = np.array(f['data'])
 f.close()
 
-for i in range(1,26):
+for i in range(1,30):
 	f = h5py.File('keras_data/db_Washington_X_%d.hdf5' % i, 'r')
 	X_test = np.vstack((X_test, np.array(f['data'])))
 	f.close()
@@ -113,7 +113,7 @@ model.add(Dropout(0.25))
 # third convolutional pair
 model.add(Convolution2D(128, 3, 3, border_mode='valid'))
 model.add(Activation('relu'))
-model.add(Convolution2D(128, 3, 3))
+#model.add(Convolution2D(128, 3, 3))
 model.add(MaxPooling2D(pool_size=(2, 2)))
 model.add(Dropout(0.25))
 
@@ -135,11 +135,11 @@ model.add(Activation('linear'))
 # load the weights 
 # note: when there is a complete match between your model definition
 # and your weight savefile, you can simply call model.load_weights(filename)
-model.load_weights('model_weights.h5')
-print('Model loaded.')
+# model.load_weights('model_weights.h5')
+# print('Model loaded.')
 
 # setting sgd optimizer parameters
-adam = Adam(lr = 1e-6, beta_1 = 0.9, beta_2 = 0.999, epsilon = 1e-8)
+adam = Adam(lr = 1e-4, beta_1 = 0.9, beta_2 = 0.999, epsilon = 1e-8)
 model.compile(loss='mean_squared_error', optimizer=adam)
 
 earlystop = callbacks.EarlyStopping(monitor='val_loss', patience = 3, 
@@ -171,10 +171,10 @@ pickle.dump( predicted, open( "predicted_normalised.p", "wb" ) )
 pickle.dump( y_test, open( "y_normalised.p", "wb" ) )
 pickle.dump( max_train, open( "max_train.p", "wb" ) )
 
-y_unnorm = un_normalise(y_in, max_train)
+y_unnorm = un_normalise(y_test, max_train)
 pred_unnorm = un_normalise(predicted, max_train)
-pickle.dump( predicted, open( "predicted_unnormalised.p", "wb" ) )
-pickle.dump( y_test, open( "y_unnormalised.p", "wb" ) )
+pickle.dump( pred_unnorm, open( "predicted_unnormalised.p", "wb" ) )
+pickle.dump( y_unnorm, open( "y_unnormalised.p", "wb" ) )
 
 fix, ax = plt.subplots()
 ax.plot(history.history['loss'], label = 'Training loss')
@@ -183,12 +183,6 @@ ax.set_xlabel('Epoch', fontsize=20)
 ax.set_ylabel('RMSE (people per km$^2$)', fontsize=20)
 plt.legend()
 plt.savefig('loss.png')
-
-plot(model, to_file='model_architecture.png')
-
-
-
-
 
 print 'Printing History'
 print history.history
