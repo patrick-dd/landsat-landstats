@@ -208,7 +208,7 @@ def sampling(sampling_rate, obs_size, nrows, ncols, df_image, satellite_gdal):
 	# collecting indices of north west corner
 	indices = np.arange(nrows*ncols).reshape((nrows, ncols))
 	indices = indices[ : -obs_size + 1, : -obs_size + 1 ]
-	df_sample['index'] = df_sample.ravel()
+	df_sample['index'] = indices.ravel()
 	# Getting the locations
 	mid_point = obs_size / 2
 	cols_grid, rows_grid = np.meshgrid( 
@@ -274,7 +274,7 @@ def mergeCensusSatellite(df_census, df_image):
 		df_image: image GeoDataFrame with census data 
 	"""
 	blocks = df_census['geometry']
-	points = df_image_old['location']
+	points = df_image['location']
 	pop = df_census['density']
 	idx = spatialIndex(blocks)
 	pixel_information = pointWithinPolygonPop(idx, points, blocks, pop)

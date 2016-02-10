@@ -32,10 +32,11 @@ from sklearn import neighbors
 from databaseConstructor import pixelToCoordinates
 
 # loading predictions
-y_pred = np.array(pickle.load(file('predicted.p', 'rb')))
+y_pred = np.array(pickle.load(file('predicted_normalised.p', 'rb')))
 print min(y_pred), max(y_pred)
 # load X values
 df_train = cPickle.load(file('knn_X_data.save', 'rb'))
+print df_train.head()
 lat = df_train['latitude']
 lon = df_train['longitude']
 X_train = [(latitude, longitude) for (latitude, longitude) in zip(lat, lon)]
