@@ -38,31 +38,34 @@ y_pred = np.array(pickle.load(file('predicted_normalised.p', 'rb')))
 print min(y_pred), max(y_pred)
 # load X values
 df_train = cPickle.load(file('knn_X_data.save', 'rb'))
+df_train = df_train[0:len(y_pred)]
 location = df_train['location']
 lat = [l.y for l in location]
-lon = [l.x for l in location] 
-X_train = [(latitude, longitude) for (latitude, longitude) in zip(lat, lon)]
-print y_pred.shape, np.array(X_train).shape
+lon = [l.x for l in location]
+df_train['lat'] = lat
+df_train['lon'] = lon
+keep_vars = ['lat', 'lon', 'B1', 'B2', 'B3', 'B4', 'B5', 'B6_VCID_2', 'B7']
+X_train = np.array(df_train[keep_vars])
+print y_pred.shape, X_train.shape
 # getting size of image file
-filename = 'LANDSAT_TOA/Washington/Washington_2010_B1.tif'
-satellite_gdal = gdal.Open(filename)
-ncols, nrows = satellite_gdal.RasterXSize, satellite_gdal.RasterYSize
-cols_grid, rows_grid = np.meshgrid(np.arange(0, nrows), np.arange(0, ncols))
-cols_grid = cols_grid.ravel()
-rows_grid=rows_grid.ravel()
-location_series = [Point(pixelToCoordinates(
-				satellite_gdal.GetGeoTransform(), col, row)) \
-				for (col, row) in zip(cols_grid, rows_grid)]
-coordinates = [ (point.y, point.x) for point in location_series]
+X_interpolate = cPickle.load(file('to_interpolate_data.save', 'rb'))
+location = X_interpolate['location']
+lat = [l.y for l in location]
+lon = [l.x for l in location]
+X_interpolate['lat'] = lat
+X_interpolate['lon'] = lon
 
-	
+X_interpolate = np.array(X_interpolate[keep_vars])
 # chopping up the grid into overlapping ranges
 kf = KFold(len(X_train), n_folds=10, shuffle=True, random_state=None)
 X_train = np.array(X_train)
 y_pred = y_pred
 
-n_neighbours = 10
-best_neighbours = 1
+
+
+
+n_neighbours = 5
+best_neighbours = 5 
 score = 10
 for train_index, test_index in kf:
 	print len(y_pred), y_pred[0]
@@ -79,16 +82,17 @@ for train_index, test_index in kf:
 	if tmp_score < score:
 		score = tmp_score
 		best_neighbours = n_neighbours
-		y_interpolated = model.predict(coordinates)
-	n_neighbours += 10
+		y_interpolated = model.predict(X_interpolate)
+	n_neighbours += 5
 
 print 'Optimal number of neighbours', best_neighbours
 
 cPickle.dump(y_interpolated, file('mapping/y_interpolated.save', 
 			'wb'), protocol= cPickle.HIGHEST_PROTOCOL)
-cPickle.dump(location_series, file('mapping/location.save', 
+cPickle.dump(X_interpolate, file('mapping/location.save', 
 			'wb'), protocol= cPickle.HIGHEST_PROTOCOL)
 
+print y_interpolated
 
 """
 For batching

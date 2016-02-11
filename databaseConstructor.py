@@ -229,7 +229,9 @@ def sampling(sampling_rate, obs_size, nrows, ncols, df_image, satellite_gdal):
 			int(len(df_sample[0]) * sampling_rate), 
 			weights=df_sample['weight'], replace=True)
 	urban_sample_idx = np.array(urban_sample.index.values)
-	df_sample = df_sample.ix[urban_sample_idx]
+	print df_sample.shape
+	df_sample = df_image.ix[urban_sample_idx]
+	print df_sample.shape
 	urban_sample_idx.sort()
 	return urban_sample_idx, df_sample
 
@@ -297,6 +299,7 @@ def sampleExtractor(data_array, sample_idx, obs_size, axis=None):
 	Returns:
 		image_sample: numpy array of images. Keras ready!
 	"""
+	print sample_idx, len(sample_idx)
 	images = extract_patches_2d(data_array, (obs_size, obs_size))
 	image_sample = np.take(images, sample_idx, axis=axis)
 	return image_sample
@@ -413,23 +416,24 @@ def databaseConstruction(census_folder_loc, census_shapefile, urban_folder_loc,
 	print 'Collecting satellite data'
 	df_image, nrows, ncols, satellite_gdal = \
 				satelliteImageToDatabase(sat_folder_loc, state_name, year, channels)
+	cPickle.dump(df_image, file('to_interpolate_data.save', 'wb'), protocol=cPickle.HIGHEST_PROTOCOL)
 	print 'Organising urban data'
-	df_urban = urbanDatabase(urban_folder_loc, state_code)
+	#df_urban = urbanDatabase(urban_folder_loc, state_code)
 	print 'Combining dataframes'
-	df_image = satUrbanDatabase(df_urban, df_image)
+	#df_image = satUrbanDatabase(df_urban, df_image)
 	print 'Sampling'
-	urban_sample_idx, knn_data = sampling(sample_rate, obs_size, nrows, ncols, 
-											df_image, satellite_gdal)
-	cPickle.dump(knn_data, file('knn_X_data.save', 'wb'), protocol=cPickle.HIGHEST_PROTOCOL)
+	#urban_sample_idx, knn_data = sampling(sample_rate, obs_size, nrows, ncols, 
+	#										df_image, satellite_gdal)
+	#cPickle.dump(knn_data, file('knn_X_data.save', 'wb'), protocol=cPickle.HIGHEST_PROTOCOL)
 	print 'Collecting census data'
-	df_census = censusDatabase(census_folder_loc, census_shapefile)
+	#df_census = censusDatabase(census_folder_loc, census_shapefile)
 	print 'Merging dataframes'
-	df_image = mergeCensusSatellite(df_census, df_image)
+	#df_image = mergeCensusSatellite(df_census, df_image)
 	print 'Creating samples for Keras'
-	X, y = sampleGenerator(obs_size, df_image, channels, nrows, ncols, urban_sample_idx)
+	#X, y = sampleGenerator(obs_size, df_image, channels, nrows, ncols, urban_sample_idx)
 	print 'Saving files'
-	saveFiles_y(y, file_size, save_folder_loc, state_name)
-	saveFiles_X(X, file_size, save_folder_loc, state_name)
+	#saveFiles_y(y, file_size, save_folder_loc, state_name)
+	#saveFiles_X(X, file_size, save_folder_loc, state_name)
 	print 'Job done!'
 
 
