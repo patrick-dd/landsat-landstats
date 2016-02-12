@@ -24,7 +24,7 @@ f = h5py.File('keras_data/db_Oregon_y_0.hdf5', 'r')
 y_train = np.array(f['data'])
 f.close()
 
-for i in range(1,10):
+for i in range(1,70):
 	print i
 	f = h5py.File('keras_data/db_Oregon_X_%d.hdf5' % i, 'r')
 	X_train = np.vstack((X_train, np.array(f['data'])))
@@ -41,7 +41,7 @@ f = h5py.File('keras_data/db_Washington_y_0.hdf5', 'r')
 y_test = np.array(f['data'])
 f.close()
 
-for i in range(1,10):
+for i in range(1,52):
 	print i
 	f = h5py.File('keras_data/db_Washington_X_%d.hdf5' % i, 'r')
 	X_test = np.vstack((X_test, np.array(f['data'])))
@@ -66,17 +66,17 @@ y_train = np.log10(y_train + 1)
 y_test = np.log10(y_test + 1)
 # </weighted_log>
 
-# <weighted>
-max_train = y_train.max()
-y_train /= max_train
-y_test /= max_train
-# </weighted>
-
 # training weights
 inv_weight, bin_val = np.histogram(y_train)
 clamp_idx = len(inv_weight) - 1
 weight_idx = [min(np.searchsorted(bin_val, v, side="left"), clamp_idx) for v in y_train]
 sample_weights = 1.0 / inv_weight[weight_idx]
+
+# <weighted>
+max_train = y_train.max()
+y_train /= max_train
+y_test /= max_train
+# </weighted>
 
 def un_normalise(y_in, max_train):
 	"""
@@ -140,7 +140,7 @@ model.add(Activation('linear'))
 #print('Model loaded.')
 
 # setting sgd optimizer parameters
-adam = Adam(lr = 1e-4, beta_1 = 0.9, beta_2 = 0.999, epsilon = 1e-8)
+adam = Adam(lr = 1e-6, beta_1 = 0.9, beta_2 = 0.999, epsilon = 1e-8)
 model.compile(loss='mean_squared_error', optimizer=adam)
 
 earlystop = callbacks.EarlyStopping(monitor='val_loss', patience = 3, 
