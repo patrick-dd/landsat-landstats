@@ -10,7 +10,7 @@ from keras.layers.convolutional import Convolution2D, MaxPooling2D
 from keras.utils import np_utils
 from keras import callbacks
 from keras.layers import advanced_activations
-from keras.optimizers import Adam
+from keras.optimizers import Adam, SGD
 
 obs_size = 64
 
@@ -97,27 +97,30 @@ print 'Creating the model'
 model = Sequential()
 
 # first convolutional pair
-model.add(Convolution2D(32, 5, 5, 
+model.add(Convolution2D(256, 5, 5, 
 			border_mode='valid',
 			input_shape = (7, obs_size, obs_size)))
 model.add(Activation('relu'))
-model.add(Convolution2D(32, 5, 5))
-model.add(MaxPooling2D(pool_size=(2, 2)))
-model.add(Dropout(0.25))
+model.add(Dropout(0.3))
 
 # second convolutional pair
 model.add(Convolution2D(64, 3, 3, border_mode='valid'))
+model.add(MaxPooling2D(pool_size=(3, 3)))
 model.add(Activation('relu'))
-model.add(Convolution2D(64, 3, 3))
-model.add(MaxPooling2D(pool_size=(2, 2)))
-model.add(Dropout(0.25))
+model.add(Dropout(0.3))
 
 # third convolutional pair
-model.add(Convolution2D(128, 3, 3, border_mode='valid'))
-model.add(Activation('relu'))
-model.add(Convolution2D(128, 3, 3))
+model.add(Convolution2D(128, 5, 5, border_mode='valid'))
 model.add(MaxPooling2D(pool_size=(2, 2)))
-model.add(Dropout(0.25))
+model.add(Activation('relu'))
+model.add(Dropout(0.3))
+
+# forth convolutional layer 
+model.add(Convolution2D(64, 3, 3))
+model.add(MaxPooling2D(pool_size=(3, 3)))
+model.add(Activation('relu'))
+model.add(Dropout(0.3))
+
 
 # convert convolutional filters to flat so they
 # can be fed to fully connected layers
@@ -125,9 +128,14 @@ model.add(Dropout(0.25))
 model.add(Flatten())
 
 # first fully connected layer
-model.add(Dense(512))
+model.add(Dense(128))
 model.add(Activation('relu'))
-model.add(Dropout(0.5))
+model.add(Dropout(0.3))
+
+# second fully connected layer
+model.add(Dense(64))
+model.add(Activation('relu'))
+model.add(Dropout(0.3))
 
 # classification fully connected layer
 model.add(Dense(1))
@@ -140,8 +148,9 @@ model.add(Activation('linear'))
 #print('Model loaded.')
 
 # setting sgd optimizer parameters
-adam = Adam(lr = 1e-6, beta_1 = 0.9, beta_2 = 0.999, epsilon = 1e-8)
-model.compile(loss='mean_squared_error', optimizer=adam)
+#adam = Adam(lr = 1e-6, beta_1 = 0.9, beta_2 = 0.999, epsilon = 1e-8)
+sgd = SGD(lr = 1, decay = 1e-6, momentum = 0.9, nesterov = True)
+model.compile(loss='mean_squared_error', optimizer='rmsprop')
 
 earlystop = callbacks.EarlyStopping(monitor='val_loss', patience = 3, 
 	verbose=1, mode='min')
