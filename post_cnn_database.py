@@ -85,6 +85,7 @@ def get_sample(dataframe, obs_size, overlap, nrows, ncols):
 		for col in col_indices:
 			tmp = mini_db[:, row : row + obs_size, col : col + obs_size ]
 			sample.append(tmp)
+	print mini_db.shape
 	return np.array(sample)
 
 def normalise_data(X):
@@ -93,54 +94,57 @@ def normalise_data(X):
 	"""
 	# mean normalisation
 	mean_value = np.mean(X)
-	X -= mean_value
 	std_value = np.std(X)
+	X -= mean_value
 	X = X / std_value
+	print std_value
 	return X
 
-def create_model():
+def create_model(weights_path=None):
 	model = Sequential()
 	model.add(Convolution2D(256, 5, 5, 
 			border_mode='valid',
 			input_shape = (7, obs_size, obs_size)))
 	model.add(Activation('relu'))
-	model.add(Dropout(0.3))
+	model.add(Dropout(0.25))
 
 	# second convolutional pair
 	model.add(Convolution2D(64, 3, 3, border_mode='valid'))
 	model.add(MaxPooling2D(pool_size=(3, 3)))
 	model.add(Activation('relu'))
-	model.add(Dropout(0.3))	
+	model.add(Dropout(0.25))	
 	# third convolutional pair
 	model.add(Convolution2D(128, 5, 5, border_mode='valid'))
 	model.add(MaxPooling2D(pool_size=(2, 2)))
 	model.add(Activation('relu'))
-	model.add(Dropout(0.3))
+	model.add(Dropout(0.25))
 	# forth convolutional layer 
 	model.add(Convolution2D(64, 3, 3))
 	model.add(MaxPooling2D(pool_size=(3, 3)))
 	model.add(Activation('relu'))
-	model.add(Dropout(0.3))
+	model.add(Dropout(0.25))
 	# convert convolutional filters to flat so they
 	# can be fed to fully connected layers
 	model.add(Flatten())
 	# first fully connected layer
 	model.add(Dense(128))
 	model.add(Activation('relu'))
-	model.add(Dropout(0.3))
+	model.add(Dropout(0.25))
 	# second fully connected layer
 	model.add(Dense(64))
 	model.add(Activation('relu'))
 	model.add(Dropout(0.3))
+	# third fully connected layer
+	model.add(Dense(25))
+	model.add(Activation('linear'))
 	# classification fully connected layer
 	model.add(Dense(1))
 	model.add(Activation('linear'))
+	if weights_path:
+		model.load_weights(weights_path)
 	return model
 
-
-# setting sgd optimizer parameters
-#sgd = SGD(lr=0.1, decay=1e-6, momentum=0.9, nesterov=True)
-def un_normalise_y(y_pred, max_train=1.3):
+def un_normalise_y(y_pred, max_train):
 	"""
 	Takes the normalised y and unnormalises import
 	"""
@@ -158,9 +162,9 @@ def get_estimates(X):
 	Returns:
 		y_pred: normalised population density predictions
 	"""
-	model_loaded = create_model()
-	model_loaded.compile(loss='mean_squared_error', optimizer='rmsprop')
-	model_loaded.load_weights('model_weights.h5')
+	model_loaded = create_model('model_weights.h5')
+	adam = Adam(lr = 0.001, beta_1 = 0.9, beta_2 = 0.999, epsilon = 1e-8)
+	model_loaded.compile(loss='mean_squared_error', optimizer='adam')
 	y_pred = model_loaded.predict(X)
 	return y_pred
 
@@ -184,17 +188,19 @@ def to_dataframe(y, sample, obs_size):
 	return pd.DataFrame(db)
 
 obs_size = 64
-overlap = 0.1
+overlap = 0.9
 nrows = 386
 ncols = 885
+max_train = 2.4
 satellite_data_name = 'to_interpolate_data.save'
 df = import_sat_data(satellite_data_name)
 sample = get_sample(df, obs_size, overlap, nrows, ncols)
 X_test = sample[:, 2:, :, :]
 X_test = normalise_data(X_test)
-print X_test
 y_pred = get_estimates(X_test)
 print y_pred
+print np.std(y_pred)
+y_pred = un_normalise_y(y_pred, max_train)
 df = to_dataframe(y_pred, sample, obs_size)
 pickle.dump( df, open( "prediction_db.p", "wb" ) )
 

@@ -24,12 +24,10 @@ f = h5py.File('keras_data/db_Oregon_y_0.hdf5', 'r')
 y_train = np.array(f['data'])
 f.close()
 
-for i in range(1,70):
-	print i
+for i in range(11,20):
 	f = h5py.File('keras_data/db_Oregon_X_%d.hdf5' % i, 'r')
 	X_train = np.vstack((X_train, np.array(f['data'])))
 	f.close()
-	print X_train.shape
 	f = h5py.File('keras_data/db_Oregon_y_%d.hdf5' % i, 'r')
 	y_train = np.hstack((y_train, f['data']))
 	f.close()
@@ -42,7 +40,7 @@ f = h5py.File('keras_data/db_Washington_y_0.hdf5', 'r')
 y_test = np.array(f['data'])
 f.close()
 
-for i in range(1,52):
+for i in range(11,20):
 	print i
 	f = h5py.File('keras_data/db_Washington_X_%d.hdf5' % i, 'r')
 	X_test = np.vstack((X_test, np.array(f['data'])))
@@ -53,10 +51,11 @@ for i in range(1,52):
 
 # mean normalisation
 mean_value = np.mean(X_train)
+std_value = np.std(X_train)
+
 X_train = X_train - mean_value
 X_test = X_test - mean_value
 
-std_value = np.std(X_train)
 X_train = X_train / std_value
 X_test = X_test / std_value
 
@@ -78,6 +77,8 @@ max_train = y_train.max()
 y_train /= max_train
 y_test /= max_train
 # </weighted>
+
+print 'Max_train', max_train
 
 def un_normalise(y_in, max_train):
 	"""
@@ -102,26 +103,25 @@ model.add(Convolution2D(256, 5, 5,
 			border_mode='valid',
 			input_shape = (7, obs_size, obs_size)))
 model.add(Activation('relu'))
-model.add(Dropout(0.3))
+model.add(Dropout(0.25))
 
 # second convolutional pair
 model.add(Convolution2D(64, 3, 3, border_mode='valid'))
 model.add(MaxPooling2D(pool_size=(3, 3)))
 model.add(Activation('relu'))
-model.add(Dropout(0.3))
+model.add(Dropout(0.25))
 
 # third convolutional pair
 model.add(Convolution2D(128, 5, 5, border_mode='valid'))
 model.add(MaxPooling2D(pool_size=(2, 2)))
 model.add(Activation('relu'))
-model.add(Dropout(0.3))
+model.add(Dropout(0.25))
 
 # forth convolutional layer 
 model.add(Convolution2D(64, 3, 3))
 model.add(MaxPooling2D(pool_size=(3, 3)))
 model.add(Activation('relu'))
-model.add(Dropout(0.3))
-
+model.add(Dropout(0.25))
 
 # convert convolutional filters to flat so they
 # can be fed to fully connected layers
@@ -138,22 +138,27 @@ model.add(Dense(64))
 model.add(Activation('relu'))
 model.add(Dropout(0.3))
 
+# third fully connected layer
+model.add(Dense(25))
+model.add(Activation('linear'))
+
 # classification fully connected layer
 model.add(Dense(1))
 model.add(Activation('linear'))
 
+
 # load the weights 
 # note: when there is a complete match between your model definition
 # and your weight savefile, you can simply call model.load_weights(filename)
-model.load_weights('model_weights.h5')
+# model.load_weights('model_weights.h5')
 print('Model loaded.')
 
 # setting sgd optimizer parameters
-adam = Adam(lr = 1e-2, beta_1 = 0.9, beta_2 = 0.999, epsilon = 1e-8)
+adam = Adam(lr = 0.001, beta_1 = 0.9, beta_2 = 0.999, epsilon = 1e-8)
 #sgd = SGD(lr = 1, decay = 1e-6, momentum = 0.9, nesterov = True)
 model.compile(loss='mean_squared_error', optimizer='adam')
 
-earlystop = callbacks.EarlyStopping(monitor='val_loss', patience = 3, 
+earlystop = callbacks.EarlyStopping(monitor='val_loss', patience = 10, 
 	verbose=1, mode='min')
 checkpoint = callbacks.ModelCheckpoint('/tmp/weights.hdf5', 
 	monitor='val_loss', verbose=1, save_best_only=True, mode='auto')
@@ -201,4 +206,4 @@ print history.history
 # save as JSON
 json_string = model.to_json()
 # save model weights
-model.save_weights('model_weights.h5', overwrite=True)
+model.save_weights('model_weights.hdf5', overwrite=True)
