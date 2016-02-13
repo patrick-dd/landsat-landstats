@@ -29,6 +29,7 @@ for i in range(1,70):
 	f = h5py.File('keras_data/db_Oregon_X_%d.hdf5' % i, 'r')
 	X_train = np.vstack((X_train, np.array(f['data'])))
 	f.close()
+	print X_train.shape
 	f = h5py.File('keras_data/db_Oregon_y_%d.hdf5' % i, 'r')
 	y_train = np.hstack((y_train, f['data']))
 	f.close()
@@ -144,13 +145,13 @@ model.add(Activation('linear'))
 # load the weights 
 # note: when there is a complete match between your model definition
 # and your weight savefile, you can simply call model.load_weights(filename)
-#model.load_weights('model_weights.h5')
-#print('Model loaded.')
+model.load_weights('model_weights.h5')
+print('Model loaded.')
 
 # setting sgd optimizer parameters
-#adam = Adam(lr = 1e-6, beta_1 = 0.9, beta_2 = 0.999, epsilon = 1e-8)
-sgd = SGD(lr = 1, decay = 1e-6, momentum = 0.9, nesterov = True)
-model.compile(loss='mean_squared_error', optimizer='rmsprop')
+adam = Adam(lr = 1e-2, beta_1 = 0.9, beta_2 = 0.999, epsilon = 1e-8)
+#sgd = SGD(lr = 1, decay = 1e-6, momentum = 0.9, nesterov = True)
+model.compile(loss='mean_squared_error', optimizer='adam')
 
 earlystop = callbacks.EarlyStopping(monitor='val_loss', patience = 3, 
 	verbose=1, mode='min')

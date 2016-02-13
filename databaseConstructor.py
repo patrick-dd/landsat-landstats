@@ -126,6 +126,7 @@ def satelliteImageToDatabase(sat_folder_loc, state_name, year, channels):
 		# getting data
 		if extension == 'B1':
 			ncols, nrows = satellite_gdal.RasterXSize, satellite_gdal.RasterYSize
+			print 'Columns, rows', ncols, nrows
 			rows_grid, cols_grid = np.meshgrid(range(0,ncols), range(0,nrows))
 			cols_grid, rows_grid = rows_grid.flatten(), cols_grid.flatten()
 			# getting a series of lat lon points for each pixel
