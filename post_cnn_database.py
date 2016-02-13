@@ -177,7 +177,7 @@ def to_dataframe(y, sample, obs_size):
 	sample = sample[:,0:2, :, :]
 	db = [['estimate', 'lat', 'lon']]
 	for i in range(len(y)):
-		prediction = y[i]
+		prediction = y[i][0]
 		lat = sample[i, 0, obs_size/2, obs_size/2]
 		lon = sample[i, 1, obs_size/2, obs_size/2]
 		db.append([prediction, lat, lon])
@@ -192,7 +192,9 @@ df = import_sat_data(satellite_data_name)
 sample = get_sample(df, obs_size, overlap, nrows, ncols)
 X_test = sample[:, 2:, :, :]
 X_test = normalise_data(X_test)
+print X_test
 y_pred = get_estimates(X_test)
+print y_pred
 df = to_dataframe(y_pred, sample, obs_size)
 pickle.dump( df, open( "prediction_db.p", "wb" ) )
 
