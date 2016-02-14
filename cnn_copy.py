@@ -24,7 +24,7 @@ f = h5py.File('keras_data/db_Oregon_y_0.hdf5', 'r')
 y_train = np.array(f['data'])
 f.close()
 
-for i in range(11,20):
+for i in range(1,50):
 	f = h5py.File('keras_data/db_Oregon_X_%d.hdf5' % i, 'r')
 	X_train = np.vstack((X_train, np.array(f['data'])))
 	f.close()
@@ -40,7 +40,7 @@ f = h5py.File('keras_data/db_Washington_y_0.hdf5', 'r')
 y_test = np.array(f['data'])
 f.close()
 
-for i in range(11,20):
+for i in range(1,52):
 	print i
 	f = h5py.File('keras_data/db_Washington_X_%d.hdf5' % i, 'r')
 	X_test = np.vstack((X_test, np.array(f['data'])))
@@ -150,7 +150,7 @@ model.add(Activation('linear'))
 # load the weights 
 # note: when there is a complete match between your model definition
 # and your weight savefile, you can simply call model.load_weights(filename)
-# model.load_weights('model_weights.h5')
+model.load_weights('model_weights.h5')
 print('Model loaded.')
 
 # setting sgd optimizer parameters
