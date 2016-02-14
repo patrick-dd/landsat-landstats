@@ -188,17 +188,17 @@ def to_dataframe(y, sample, obs_size):
 	return pd.DataFrame(db)
 
 obs_size = 64
-overlap = 0.9
+overlap = 0.95
 nrows = 386
 ncols = 885
-max_train = 2.4
+max_train = 2.65
 satellite_data_name = 'to_interpolate_data.save'
 df = import_sat_data(satellite_data_name)
 sample = get_sample(df, obs_size, overlap, nrows, ncols)
 X_test = sample[:, 2:, :, :]
 X_test = normalise_data(X_test)
 y_pred = get_estimates(X_test)
-print y_pred
+print len(y_pred)
 print np.std(y_pred)
 y_pred = un_normalise_y(y_pred, max_train)
 df = to_dataframe(y_pred, sample, obs_size)
