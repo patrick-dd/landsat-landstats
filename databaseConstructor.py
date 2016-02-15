@@ -223,6 +223,8 @@ def sampling(sampling_rate, obs_size, nrows, ncols, df_image, satellite_gdal):
 	# Creating sample weights 
 	seed = 1996
 	urban_rank = df_sample[0].rank(ascending=False)
+	# weighting the urban areas way more heavily
+	urban_rank = [ u**5 for u in urban_rank ]
 	df_sample['rank'] = urban_rank
 	sumrank = df_sample['rank'].sum()
 	df_sample['weight'] = (df_sample['rank']) / sumrank
@@ -419,22 +421,22 @@ def databaseConstruction(census_folder_loc, census_shapefile, urban_folder_loc,
 				satelliteImageToDatabase(sat_folder_loc, state_name, year, channels)
 	cPickle.dump(df_image, file('to_interpolate_data.save', 'wb'), protocol=cPickle.HIGHEST_PROTOCOL)
 	print 'Organising urban data'
-	#df_urban = urbanDatabase(urban_folder_loc, state_code)
+	df_urban = urbanDatabase(urban_folder_loc, state_code)
 	print 'Combining dataframes'
-	#df_image = satUrbanDatabase(df_urban, df_image)
+	df_image = satUrbanDatabase(df_urban, df_image)
 	print 'Sampling'
-	#urban_sample_idx, knn_data = sampling(sample_rate, obs_size, nrows, ncols, 
-	#										df_image, satellite_gdal)
-	#cPickle.dump(knn_data, file('knn_X_data.save', 'wb'), protocol=cPickle.HIGHEST_PROTOCOL)
+	urban_sample_idx, knn_data = sampling(sample_rate, obs_size, nrows, ncols, 
+											df_image, satellite_gdal)
+	cPickle.dump(knn_data, file('knn_X_data.save', 'wb'), protocol=cPickle.HIGHEST_PROTOCOL)
 	print 'Collecting census data'
-	#df_census = censusDatabase(census_folder_loc, census_shapefile)
+	df_census = censusDatabase(census_folder_loc, census_shapefile)
 	print 'Merging dataframes'
-	#df_image = mergeCensusSatellite(df_census, df_image)
+	df_image = mergeCensusSatellite(df_census, df_image)
 	print 'Creating samples for Keras'
-	#X, y = sampleGenerator(obs_size, df_image, channels, nrows, ncols, urban_sample_idx)
+	X, y = sampleGenerator(obs_size, df_image, channels, nrows, ncols, urban_sample_idx)
 	print 'Saving files'
-	#saveFiles_y(y, file_size, save_folder_loc, state_name)
-	#saveFiles_X(X, file_size, save_folder_loc, state_name)
+	saveFiles_y(y, file_size, save_folder_loc, state_name)
+	saveFiles_X(X, file_size, save_folder_loc, state_name)
 	print 'Job done!'
 
 

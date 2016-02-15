@@ -5,8 +5,6 @@ Creates the database using the file databaseConstructor.py
 ## Creating a database!
 
 from databaseConstructor import *
-
-
 ## Note the file naming
 ## Number _53_ for Washington
 ## Number _41_ for Oregon
@@ -24,7 +22,7 @@ save_folder_loc = 'keras_data/'
 # a file size of 10 ~ 1mb
 file_size = 1024				# number of observations in each file
 sample_rate = 0.2				# number of total images sampled
-obs_size = 64					# size of image
+obs_size = 32					# size of image
 
 databaseConstruction(census_folder_loc, census_shapefile, urban_folder_loc,
 		sat_folder_loc, save_folder_loc, state_name, state_code, year, channels,
