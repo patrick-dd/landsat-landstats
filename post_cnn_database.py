@@ -63,7 +63,7 @@ def import_sat_data(file_name):
 	return df_interpolate
 
 
-def get_sample(dataframe, obs_size, overlap, nrows, ncols):
+def get_sample(dataframe, obs_size, non_overlap, nrows, ncols):
 	"""
 	Generates sample of images for estimation
 	Inputs:
@@ -76,8 +76,8 @@ def get_sample(dataframe, obs_size, overlap, nrows, ncols):
 	"""
 	mini_db = [dataframe[:,i].reshape((nrows, ncols)) for i in range(dataframe.shape[1])]
 	mini_db = np.array(mini_db)
-	row_length = int((nrows - obs_size + 1) / (overlap * obs_size))
-	col_length = int((ncols - obs_size + 1) / (overlap * obs_size))
+	row_length = int((nrows - obs_size + 1) / (non_overlap * obs_size))
+	col_length = int((ncols - obs_size + 1) / (non_overlap * obs_size))
 	row_indices = np.random.random_integers(0, nrows - obs_size + 1, row_length)
 	col_indices = np.random.random_integers(0, ncols - obs_size + 1, col_length)
 	sample = []
@@ -188,13 +188,13 @@ def to_dataframe(y, sample, obs_size):
 	return pd.DataFrame(db)
 
 obs_size = 64
-overlap = 0.95
+non_overlap = 8/float(obs_size)
 nrows = 386
 ncols = 885
 max_train = 2.65
 satellite_data_name = 'to_interpolate_data.save'
 df = import_sat_data(satellite_data_name)
-sample = get_sample(df, obs_size, overlap, nrows, ncols)
+sample = get_sample(df, obs_size, non_overlap, nrows, ncols)
 X_test = sample[:, 2:, :, :]
 X_test = normalise_data(X_test)
 y_pred = get_estimates(X_test)

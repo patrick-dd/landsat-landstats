@@ -126,6 +126,6 @@ actual_density = DataFrame(result.groupby(['NAMELSAD10'])['census_density'].mean
 output = pd.merge( estimate_density, actual_density, left_index=True, right_index=True)
 output.reset_index(level=0, inplace=True)
 # save results
-engine = create_engine('mysql+pymysql://root:@localhost/website_db', echo=False)
-output.to_sql('website_database', engine, chunksize=20000)
+engine = create_engine('mysql+pymysql://root:@localhost/lsls', echo=False)
+output.to_sql('wa_counties', engine, chunksize=20000)
 output.to_csv('website_database.csv')
