@@ -8,12 +8,12 @@ from databaseConstructor import *
 ## Note the file naming
 ## Number _53_ for Washington
 ## Number _41_ for Oregon
-census_shapefile = 'tabblock2010_53_pophu.shp'
-state_name = 'Washington'
-state_code = 'WA'
+census_shapefile = 'tabblock2010_41_pophu.shp'
+state_name = 'Oregon'
+state_code = 'OR'
 year = '2010'
 
-channels = ['B1', 'B2', 'B3', 'B4', 'B5', 'B6_VCID_2', 'B7']
+channels = ['B1', 'B2', 'B3', 'B4'] #, 'B5', 'B6_VCID_2', 'B7']
 sat_folder_loc = 'LANDSAT_TOA/' + state_name + '/'
 census_folder_loc = state_name + '_block_data/'
 urban_folder_loc = 'urban_areas/'

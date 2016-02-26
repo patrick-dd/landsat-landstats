@@ -9,10 +9,10 @@ from keras.layers.core import Dense, Activation, Dropout, Flatten
 from keras.layers.convolutional import Convolution2D, MaxPooling2D
 from keras.utils import np_utils
 from keras import callbacks
-from keras.layers import advanced_activations
+from keras.layers.advanced_activations import LeakyReLU
 from keras.optimizers import Adam, SGD
 
-obs_size = 64
+obs_size = 32 
 
 print('Reading data')
 
@@ -24,7 +24,7 @@ f = h5py.File('keras_data/db_Oregon_y_0.hdf5', 'r')
 y_train = np.array(f['data'])
 f.close()
 
-for i in range(1,50):
+for i in range(1,78):
 	f = h5py.File('keras_data/db_Oregon_X_%d.hdf5' % i, 'r')
 	X_train = np.vstack((X_train, np.array(f['data'])))
 	f.close()
@@ -40,7 +40,7 @@ f = h5py.File('keras_data/db_Washington_y_0.hdf5', 'r')
 y_test = np.array(f['data'])
 f.close()
 
-for i in range(1,52):
+for i in range(1,60):
 	print i
 	f = h5py.File('keras_data/db_Washington_X_%d.hdf5' % i, 'r')
 	X_test = np.vstack((X_test, np.array(f['data'])))
@@ -58,6 +58,9 @@ X_test = X_test - mean_value
 
 X_train = X_train / std_value
 X_test = X_test / std_value
+
+print mean_value, std_value
+
 
 # normalize target values
 
@@ -102,26 +105,26 @@ model = Sequential()
 model.add(Convolution2D(256, 5, 5, 
 			border_mode='valid',
 			input_shape = (7, obs_size, obs_size)))
-model.add(Activation('relu'))
-model.add(Dropout(0.25))
+model.add(LeakyReLU(alpha=0.001))
+model.add(Dropout(0.3))
 
 # second convolutional pair
-model.add(Convolution2D(64, 3, 3, border_mode='valid'))
+model.add(Convolution2D(128, 3, 3, border_mode='valid'))
 model.add(MaxPooling2D(pool_size=(3, 3)))
-model.add(Activation('relu'))
-model.add(Dropout(0.25))
+model.add(LeakyReLU(alpha=0.001))
+model.add(Dropout(0.3))
 
 # third convolutional pair
-model.add(Convolution2D(128, 5, 5, border_mode='valid'))
+model.add(Convolution2D(128, 3, 3, border_mode='valid'))
 model.add(MaxPooling2D(pool_size=(2, 2)))
-model.add(Activation('relu'))
-model.add(Dropout(0.25))
+model.add(LeakyReLU(alpha=0.001))
+model.add(Dropout(0.3))
 
 # forth convolutional layer 
-model.add(Convolution2D(64, 3, 3))
-model.add(MaxPooling2D(pool_size=(3, 3)))
-model.add(Activation('relu'))
-model.add(Dropout(0.25))
+#model.add(Convolution2D(128, 3, 3))
+#model.add(MaxPooling2D(pool_size=(2, 2)))
+#model.add(Activation('relu'))
+#model.add(Dropout(0.3))
 
 # convert convolutional filters to flat so they
 # can be fed to fully connected layers
@@ -150,13 +153,13 @@ model.add(Activation('linear'))
 # load the weights 
 # note: when there is a complete match between your model definition
 # and your weight savefile, you can simply call model.load_weights(filename)
-model.load_weights('model_weights.h5')
-print('Model loaded.')
+#model.load_weights('model_weights.h5')
+#print('Model loaded.')
 
 # setting sgd optimizer parameters
-adam = Adam(lr = 0.001, beta_1 = 0.9, beta_2 = 0.999, epsilon = 1e-8)
-#sgd = SGD(lr = 1, decay = 1e-6, momentum = 0.9, nesterov = True)
-model.compile(loss='mean_squared_error', optimizer='adam')
+#adam = Adam(lr = 0.01, beta_1 = 0.9, beta_2 = 0.999, epsilon = 1e-8)
+sgd = SGD(lr = 1, decay = 1e-6, momentum = 0.9, nesterov = True)
+model.compile(loss='mean_squared_error', optimizer='sgd')
 
 earlystop = callbacks.EarlyStopping(monitor='val_loss', patience = 10, 
 	verbose=1, mode='min')

@@ -17,9 +17,10 @@ from rtree import index
 from geopandas import GeoDataFrame
 from functools import partial
 from sklearn.feature_extraction.image import extract_patches_2d
+import parmap
+from multiprocessing import Pool
 
-
-def pixelToCoordinates(geotransform, column, row):
+def pixelToCoordinates(column, row, geotransform):
 	"""
 	Returns lat lon coordinates from pixel position 
 	using an affine transformation
@@ -130,15 +131,21 @@ def satelliteImageToDatabase(sat_folder_loc, state_name, year, channels):
 			rows_grid, cols_grid = np.meshgrid(range(0,ncols), range(0,nrows))
 			cols_grid, rows_grid = rows_grid.flatten(), cols_grid.flatten()
 			# getting a series of lat lon points for each pixel
-			location_series = [Point(pixelToCoordinates(
-				satellite_gdal.GetGeoTransform(), col, row)) \
-				for (col, row) in zip(cols_grid, rows_grid)]
+			print 'Getting locations'
+			geotransform = satellite_gdal.GetGeoTransform()
+			location_series =  parmap.starmap(pixelToCoordinates, 
+										zip(cols_grid, rows_grid), geotransform, processes=8)
+			pool = Pool(processes = 8)
+			print 'Converting to Points'
+			location_series = pool.map(Point, location_series)
 			# pixel data
+			print extension
 			band = satellite_gdal.GetRasterBand(1)
 			array = band.ReadAsArray()
 			band_series = [array[row][col] for (col, row) in zip(cols_grid, rows_grid)]
 			data.append(band_series)
 		else:
+			print extension
 			band = satellite_gdal.GetRasterBand(1)
 			array = band.ReadAsArray()
 			band_series = np.array([array[row][col] for (col, row) in zip(cols_grid, rows_grid)])
@@ -149,9 +156,9 @@ def satelliteImageToDatabase(sat_folder_loc, state_name, year, channels):
 		'B2': data[1],
 		'B3': data[2],
 		'B4': data[3],
-		'B5': data[4],
-		'B6_VCID_2': data[5],
-		'B7': data[6],
+		#'B5': data[4],
+		#'B6_VCID_2': data[5],
+		#'B7': data[6],
 		})
 	return df_image, nrows, ncols, satellite_gdal
 
@@ -203,10 +210,12 @@ def sampling(sampling_rate, obs_size, nrows, ncols, df_image, satellite_gdal):
 	# Getting the sum of urban pixels for each patch
 	urban_array = df_image['urban'].fillna(0)
 	urban_array = np.array(urban_array).reshape((nrows, ncols))
+	print 'extracting patches'
 	urban_patches = extract_patches_2d(urban_array, (obs_size, obs_size))
 	urban_count = [np.sum(patch) for patch in urban_patches]
 	df_sample = pd.DataFrame(urban_count)
 	# collecting indices of north west corner
+	print 'collecting indices'
 	indices = np.arange(nrows*ncols).reshape((nrows, ncols))
 	indices = indices[ : -obs_size + 1, : -obs_size + 1 ]
 	df_sample['index'] = indices.ravel()
@@ -216,12 +225,17 @@ def sampling(sampling_rate, obs_size, nrows, ncols, df_image, satellite_gdal):
 							range(mid_point, mid_point + ncols - obs_size + 1), 
 							range(mid_point, mid_point + nrows - obs_size + 1))
 	rows_grid, cols_grid = rows_grid.ravel(), cols_grid.ravel()
-	location_series = [Point(pixelToCoordinates(
-				satellite_gdal.GetGeoTransform(), col, row)) \
-				for (col, row) in zip(cols_grid, rows_grid)]
+	print 'assigning pixels to coordinates'
+	geotransform = satellite_gdal.GetGeoTransform()
+	location_series =  parmap.starmap(pixelToCoordinates, 
+				zip(cols_grid, rows_grid), geotransform, processes=8)
+	pool = Pool(processes = 8)
+	print 'Converting to Points'
+	location_series = pool.map(Point, location_series)
 	df_sample['location'] = location_series
 	# Creating sample weights 
 	seed = 1996
+	print df_sample[0].hist()
 	urban_rank = df_sample[0].rank(ascending=False)
 	# weighting the urban areas way more heavily
 	urban_rank = [ u**5 for u in urban_rank ]
