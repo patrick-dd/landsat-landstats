@@ -17,6 +17,8 @@ from rtree import index
 from geopandas import GeoDataFrame
 from functools import partial
 from sklearn.feature_extraction.image import extract_patches_2d
+from Multiprocessing import Pool
+import parmap
 
 
 def pixelToCoordinates(geotransform, column, row):
@@ -130,9 +132,13 @@ def satelliteImageToDatabase(sat_folder_loc, state_name, year, channels):
 			rows_grid, cols_grid = np.meshgrid(range(0,ncols), range(0,nrows))
 			cols_grid, rows_grid = rows_grid.flatten(), cols_grid.flatten()
 			# getting a series of lat lon points for each pixel
-			location_series = [Point(pixelToCoordinates(
-				satellite_gdal.GetGeoTransform(), col, row)) \
-				for (col, row) in zip(cols_grid, rows_grid)]
+			print 'Getting locations'
+			geotransform = satellite_gdal.GetGeoTransform()                 
+			location_series = parmap.starmap(pixelToCoordinates, 
+				zip(cols_grid, rows_grid), geotransform, processes=8)
+			pool = Pool(processes = 8)
+			print 'Converting to Points'
+			location_series = pool.map(Point, location_series)
 			# pixel data
 			band = satellite_gdal.GetRasterBand(1)
 			array = band.ReadAsArray()
@@ -149,9 +155,9 @@ def satelliteImageToDatabase(sat_folder_loc, state_name, year, channels):
 		'B2': data[1],
 		'B3': data[2],
 		'B4': data[3],
-		'B5': data[4],
-		'B6_VCID_2': data[5],
-		'B7': data[6],
+		#'B5': data[4],
+		#'B6_VCID_2': data[5],
+		#'B7': data[6],
 		})
 	return df_image, nrows, ncols, satellite_gdal
 
@@ -188,6 +194,36 @@ def satUrbanDatabase(df_urban, df_image):
 	df_image['longitude_u'] = pixelPoint_urban['longitude']
 	return df_image
 
+def image_slicer(image, obs_size, overlap, nrows, ncols, slicedepth):
+	"""
+	Cuts the larger satellite image into smaller images 
+	A less intense version of extract_patches_2d
+
+	Inputs:
+		- image: the geotiff image 
+		- obs_size: the observation size 
+		- overlap: proportion of image you want to overlap
+	Returns:
+		- patches: the tiles
+		- indices: index of the nw corner of each patch 
+	"""
+	patches = []
+	step = int(obs_size * overlap)
+	print step
+	indices = []
+	for y in range(0, nrows, step):
+		for x in range(0, ncols, step):
+			mx = min(x+obs_size, ncols)
+			my = min(y+obs_size, nrows)
+			print x, mx, y, my
+			tile = image[ :, x: mx, y: my ]
+			if tile.shape == (slicedepth, obs_size, obs_size):
+				patches.append(tile)
+				indices.append((x, y))
+	return np.array(patches), np.array(indices)
+
+
+
 def sampling(sampling_rate, obs_size, nrows, ncols, df_image, satellite_gdal):
 	"""
 	Constructs a weighted sample of images from the GeoDataFrame
@@ -203,25 +239,30 @@ def sampling(sampling_rate, obs_size, nrows, ncols, df_image, satellite_gdal):
 	# Getting the sum of urban pixels for each patch
 	urban_array = df_image['urban'].fillna(0)
 	urban_array = np.array(urban_array).reshape((nrows, ncols))
-	urban_patches = extract_patches_2d(urban_array, (obs_size, obs_size))
+	print 'extract patches'
+	patches, indices = image_slicer(image, obs_size, 0.5, nrows, ncols, 4)
+	print 'counting urban'
 	urban_count = [np.sum(patch) for patch in urban_patches]
 	df_sample = pd.DataFrame(urban_count)
 	# collecting indices of north west corner
-	indices = np.arange(nrows*ncols).reshape((nrows, ncols))
-	indices = indices[ : -obs_size + 1, : -obs_size + 1 ]
-	df_sample['index'] = indices.ravel()
+	print 'collecting indices'
+	df_sample['index'] = indices
 	# Getting the locations
+	print 'get locations'
 	mid_point = obs_size / 2
-	cols_grid, rows_grid = np.meshgrid( 
-							range(mid_point, mid_point + ncols - obs_size + 1), 
-							range(mid_point, mid_point + nrows - obs_size + 1))
-	rows_grid, cols_grid = rows_grid.ravel(), cols_grid.ravel()
-	location_series = [Point(pixelToCoordinates(
-				satellite_gdal.GetGeoTransform(), col, row)) \
-				for (col, row) in zip(cols_grid, rows_grid)]
+	pool = Pool(processes = 8)
+	cols_grid = pool.map(lambda x: x + mid_point, indices[:,0])
+	rows_grid = pool.map(lambda x: x + mid_point, indices[:,1])
+	print 'location series'
+	geotransform = satellite_gdal.GetGeoTransform()                 
+	location_series = parmap.starmap(pixelToCoordinates, 
+		zip(cols_grid, rows_grid), geotransform, processes=8)
+	print 'Converting to Points'
+	location_series = pool.map(Point, location_series)
 	df_sample['location'] = location_series
 	# Creating sample weights 
 	seed = 1996
+	print df_sample[0].hist()
 	urban_rank = df_sample[0].rank(ascending=False)
 	# weighting the urban areas way more heavily
 	urban_rank = [ u**5 for u in urban_rank ]
