@@ -17,8 +17,9 @@ from rtree import index
 from geopandas import GeoDataFrame
 from functools import partial
 from sklearn.feature_extraction.image import extract_patches_2d
-import parmap
 from multiprocessing import Pool
+import parmap
+
 
 def pixelToCoordinates(column, row, geotransform):
 	"""
@@ -133,19 +134,19 @@ def satelliteImageToDatabase(sat_folder_loc, state_name, year, channels):
 			# getting a series of lat lon points for each pixel
 			print 'Getting locations'
 			geotransform = satellite_gdal.GetGeoTransform()
-			location_series =  parmap.starmap(pixelToCoordinates, 
-										zip(cols_grid, rows_grid), geotransform, processes=8)
+			print 'Geotransform:', geotransform
+			print 'Geotransform[0]:', geotransform[0]
+			location_series = parmap.starmap(pixelToCoordinates, 
+				zip(cols_grid, rows_grid), geotransform, processes=8)
 			pool = Pool(processes = 8)
 			print 'Converting to Points'
 			location_series = pool.map(Point, location_series)
 			# pixel data
-			print extension
 			band = satellite_gdal.GetRasterBand(1)
 			array = band.ReadAsArray()
 			band_series = [array[row][col] for (col, row) in zip(cols_grid, rows_grid)]
 			data.append(band_series)
 		else:
-			print extension
 			band = satellite_gdal.GetRasterBand(1)
 			array = band.ReadAsArray()
 			band_series = np.array([array[row][col] for (col, row) in zip(cols_grid, rows_grid)])
@@ -195,6 +196,58 @@ def satUrbanDatabase(df_urban, df_image):
 	df_image['longitude_u'] = pixelPoint_urban['longitude']
 	return df_image
 
+def image_slicer(image, obs_size, overlap, nrows, ncols, slice_depth):
+	"""
+	Cuts the larger satellite image into smaller images 
+	A less intense version of extract_patches_2d
+
+	Inputs:
+		- image: the geotiff image 
+		- obs_size: the observation size 
+		- overlap: proportion of image you want to overlap
+	Returns:
+		- patches: the tiles
+		- indices: index of the nw corner of each patch 
+	"""
+	patches = []
+	step = int(obs_size * overlap)
+	print step
+	indices = []
+	if slice_depth == 1:
+		for y in range(0, nrows, step):
+			for x in range(0, ncols, step):
+				mx = min(x+obs_size, ncols)
+				my = min(y+obs_size, nrows)
+				print x, mx, y, my
+				tile = image[ x: mx, y: my ]
+				if tile.shape == (obs_size, obs_size):
+					patches.append(tile)
+					indices.append((x, y))
+	else:
+		for y in range(0, nrows, step):
+			for x in range(0, ncols, step):
+				mx = min(x+obs_size, ncols)
+				my = min(y+obs_size, nrows)
+				print x, mx, y, my
+				tile = image[ :, x: mx, y: my ]
+				if tile.shape == (slice_depth, obs_size, obs_size):
+					patches.append(tile)
+					indices.append((x, y))
+	return np.array(patches), np.array(indices)
+
+def adder(x):
+	"""
+	Adds two variables. Useful in parallelising operation
+	Takes the north west corner of an image and returns the centroid
+	Inputs: 
+		x: north west corner
+		midpoint: half the length of an image	
+	Returns:
+		image midpoint
+	"""
+	return x + 16
+
+
 def sampling(sampling_rate, obs_size, nrows, ncols, df_image, satellite_gdal):
 	"""
 	Constructs a weighted sample of images from the GeoDataFrame
@@ -210,26 +263,22 @@ def sampling(sampling_rate, obs_size, nrows, ncols, df_image, satellite_gdal):
 	# Getting the sum of urban pixels for each patch
 	urban_array = df_image['urban'].fillna(0)
 	urban_array = np.array(urban_array).reshape((nrows, ncols))
-	print 'extracting patches'
-	urban_patches = extract_patches_2d(urban_array, (obs_size, obs_size))
+	print 'extract patches'
+	urban_patches, u_indices = image_slicer(
+					urban_array, obs_size, 0.5, nrows, ncols, 1)
+	print 'counting urban'
 	urban_count = [np.sum(patch) for patch in urban_patches]
 	df_sample = pd.DataFrame(urban_count)
-	# collecting indices of north west corner
-	print 'collecting indices'
-	indices = np.arange(nrows*ncols).reshape((nrows, ncols))
-	indices = indices[ : -obs_size + 1, : -obs_size + 1 ]
-	df_sample['index'] = indices.ravel()
 	# Getting the locations
+	print 'get locations'
 	mid_point = obs_size / 2
-	cols_grid, rows_grid = np.meshgrid( 
-							range(mid_point, mid_point + ncols - obs_size + 1), 
-							range(mid_point, mid_point + nrows - obs_size + 1))
-	rows_grid, cols_grid = rows_grid.ravel(), cols_grid.ravel()
-	print 'assigning pixels to coordinates'
-	geotransform = satellite_gdal.GetGeoTransform()
-	location_series =  parmap.starmap(pixelToCoordinates, 
-				zip(cols_grid, rows_grid), geotransform, processes=8)
 	pool = Pool(processes = 8)
+	cols_grid = pool.map(adder, u_indices[:,0])
+	rows_grid = pool.map(adder, u_indices[:,1])
+	print 'location series'
+	geotransform = satellite_gdal.GetGeoTransform()                 
+	location_series = parmap.starmap(pixelToCoordinates, 
+		zip(cols_grid, rows_grid), geotransform, processes=8)
 	print 'Converting to Points'
 	location_series = pool.map(Point, location_series)
 	df_sample['location'] = location_series
@@ -317,8 +366,8 @@ def sampleExtractor(data_array, sample_idx, obs_size, axis=None):
 		image_sample: numpy array of images. Keras ready!
 	"""
 	print sample_idx, len(sample_idx)
-	images = extract_patches_2d(data_array, (obs_size, obs_size))
-	image_sample = np.take(images, sample_idx, axis=axis)
+	patches, indices = image_slicer(data_array, obs_size, 0.5, nrows, ncols, 4)
+	image_sample = np.take(patches, sample_idx, axis=axis)
 	return image_sample
 
 def sampleGenerator(obs_size, df_image, channels, nrows, 
