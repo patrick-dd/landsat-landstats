@@ -107,6 +107,18 @@ def pointWithinPolygon(idx, points, polygons):
 		count += 1
 	return GeoDataFrame(pixelPoint_db)
 
+def point_wrapper(x, y):
+	"""
+	A wrapper to use the point function in parallel 
+	"""
+	return Point((x, y))
+
+def array_wrapper(col, row, array):
+	"""
+	A wrapper to use the point function in parallel 
+	"""
+	return array[row][col]
+
 def satelliteImageToDatabase(sat_folder_loc, state_name, year, channels):
 	"""
 	Converts satellite images to a GeoDataFrame
@@ -126,6 +138,7 @@ def satelliteImageToDatabase(sat_folder_loc, state_name, year, channels):
 		filename = sat_folder_loc + state_name + '_' + year + '_' + extension + '.tif'
 		satellite_gdal = gdal.Open(filename)
 		# getting data
+		print extension
 		if extension == 'B1':
 			ncols, nrows = satellite_gdal.RasterXSize, satellite_gdal.RasterYSize
 			print 'Columns, rows', ncols, nrows
@@ -134,23 +147,37 @@ def satelliteImageToDatabase(sat_folder_loc, state_name, year, channels):
 			# getting a series of lat lon points for each pixel
 			print 'Getting locations'
 			geotransform = satellite_gdal.GetGeoTransform()
-			print 'Geotransform:', geotransform
-			print 'Geotransform[0]:', geotransform[0]
 			location_series = parmap.starmap(pixelToCoordinates, 
-				zip(cols_grid, rows_grid), geotransform, processes=8)
-			pool = Pool(processes = 8)
+												zip(cols_grid, rows_grid), 
+												geotransform, processes=8)
 			print 'Converting to Points'
-			location_series = pool.map(Point, location_series)
+			location_series = parmap.starmap(point_wrapper, 
+												zip(col_grid, rows_grid), 
+												processes=8)
+			print location_series[0:10]
 			# pixel data
 			band = satellite_gdal.GetRasterBand(1)
 			array = band.ReadAsArray()
-			band_series = [array[row][col] for (col, row) in zip(cols_grid, rows_grid)]
+			band_series = parmap.starmap(array_wrapper, 
+											zip(cols_grid, rows_grid), 
+											array)
+			#band_series = [array[row][col] for (col, row) in 
+			#				zip(cols_grid, rows_grid)]
 			data.append(band_series)
 		else:
 			band = satellite_gdal.GetRasterBand(1)
 			array = band.ReadAsArray()
-			band_series = np.array([array[row][col] for (col, row) in zip(cols_grid, rows_grid)])
+			band_series = parmap.starmap(array_wrapper, 
+											zip(cols_grid, rows_grid), 
+											array)
+			#band_series = np.array([array[row][col] for (col, row) in
+			#					 zip(cols_grid, rows_grid)])
 			data.append(band_series)
+	print len(location_series)
+	print len(data[0])
+	print len(data[1])
+	print len(data[2])
+	print len(data[3])
 	df_image = GeoDataFrame({
 		'location': location_series,
 		'B1': data[0],
