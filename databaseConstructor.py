@@ -151,6 +151,7 @@ def satelliteImageToDatabase(sat_folder_loc, state_name, year, channels):
 												zip(cols_grid, rows_grid), 
 												geotransform, processes=8)
 			print 'Converting to Points'
+			print point_wrapper(cols_grid[100], rows_grid[100])
 			location_series = parmap.starmap(point_wrapper, 
 												zip(cols_grid, rows_grid), 
 												processes=8)
