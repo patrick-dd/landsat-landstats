@@ -395,9 +395,7 @@ def sampleExtractor(data_array, sample_idx, obs_size, nrows, ncols, axis=None):
 	Returns:
 		image_sample: numpy array of images. Keras ready!
 	"""
-	print sample_idx, len(sample_idx)
-        print data_array.shape
-	patches, indices = image_slicer(data_array, obs_size, 0.5, nrows, ncols, 4)
+	patches, indices = image_slicer(data_array, obs_size, 0.5, nrows, ncols, 1)
 	image_sample = np.take(patches, sample_idx, axis=axis)
 	return image_sample
 
