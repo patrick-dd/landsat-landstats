@@ -157,7 +157,8 @@ def satelliteImageToDatabase(sat_folder_loc, state_name, year, channels):
 			location_series = parmap.starmap(point_wrapper, 
 											zip(cols_grid, rows_grid), 
 												processes=8)
-                        # pixel data
+            print location_series[0:10]
+            # pixel data
 			band = satellite_gdal.GetRasterBand(1)
 			array = band.ReadAsArray()
 			band_series = parmap.starmap(array_wrapper, 
@@ -167,6 +168,7 @@ def satelliteImageToDatabase(sat_folder_loc, state_name, year, channels):
 			#				zip(cols_grid, rows_grid)]
 			data.append(band_series)
 		else:
+			print location_series[0:10]
 			band = satellite_gdal.GetRasterBand(1)
 			array = band.ReadAsArray()
 			band_series = parmap.starmap(array_wrapper, 
@@ -175,6 +177,7 @@ def satelliteImageToDatabase(sat_folder_loc, state_name, year, channels):
 			#band_series = np.array([array[row][col] for (col, row) in
 			#					 zip(cols_grid, rows_grid)])
 			data.append(band_series)
+	print location_series[0:10]
 	df_image = GeoDataFrame({
 		'location': location_series,
 		'B1': data[0],
@@ -185,7 +188,7 @@ def satelliteImageToDatabase(sat_folder_loc, state_name, year, channels):
 		#'B6_VCID_2': data[5],
 		#'B7': data[6],
 		})
-        print df_image.head()
+	print df_image.head()
 	return df_image, nrows, ncols, satellite_gdal
 
 def urbanDatabase(urban_folder_loc, state_code):
