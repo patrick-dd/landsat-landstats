@@ -140,29 +140,27 @@ def satelliteImageToDatabase(sat_folder_loc, state_name, year, channels):
 		# getting data
 		print extension
 		if extension == 'B1':
-			ncols, nrows = satellite_gdal.RasterXSize, satellite_gdal.RasterYSize
+			ncols, nrows = 50, 50 
+			# satellite_gdal.RasterXSize, satellite_gdal.RasterYSize
 			print 'Columns, rows', ncols, nrows
 			rows_grid, cols_grid = np.meshgrid(range(0,ncols), range(0,nrows))
 			cols_grid, rows_grid = rows_grid.flatten(), cols_grid.flatten()
 			# getting a series of lat lon points for each pixel
 			print 'Getting geo data'
-			print point_wrapper(cols_grid[100:110], rows_grid[100:110])
 			geotransform = satellite_gdal.GetGeoTransform()
 			print 'Getting locations'
 			location_series = parmap.starmap(pixelToCoordinates, 
-												zip(cols_grid, rows_grid), 
+											zip(cols_grid, rows_grid), 
 												geotransform, processes=8)
 			print 'Converting to Points'
-			
 			location_series = parmap.starmap(point_wrapper, 
-												zip(cols_grid, rows_grid), 
+											zip(cols_grid, rows_grid), 
 												processes=8)
-			print location_series[]
 			# pixel data
 			band = satellite_gdal.GetRasterBand(1)
 			array = band.ReadAsArray()
 			band_series = parmap.starmap(array_wrapper, 
-											zip(cols_grid, rows_grid), 
+										zip(cols_grid, rows_grid), 
 											array)
 			#band_series = [array[row][col] for (col, row) in 
 			#				zip(cols_grid, rows_grid)]
@@ -171,7 +169,7 @@ def satelliteImageToDatabase(sat_folder_loc, state_name, year, channels):
 			band = satellite_gdal.GetRasterBand(1)
 			array = band.ReadAsArray()
 			band_series = parmap.starmap(array_wrapper, 
-											zip(cols_grid, rows_grid), 
+					zip(cols_grid, rows_grid), 
 											array)
 			#band_series = np.array([array[row][col] for (col, row) in
 			#					 zip(cols_grid, rows_grid)])
@@ -303,10 +301,12 @@ def sampling(sampling_rate, obs_size, nrows, ncols, df_image, satellite_gdal):
 	print 'get locations'
 	mid_point = obs_size / 2
 	pool = Pool(processes = 8)
+	print np.array(u_indices).shape
+        print u_indices
 	cols_grid = pool.map(adder, u_indices[:,0])
 	rows_grid = pool.map(adder, u_indices[:,1])
 	print 'location series'
-	geotransform = satellite_gdal.GetGeoTransform()                 
+	geotransform = satellite_gdal.GetGeoTransform()				 
 	location_series = parmap.starmap(pixelToCoordinates, 
 		zip(cols_grid, rows_grid), geotransform, processes=8)
 	print 'Converting to Points'
@@ -384,7 +384,7 @@ def mergeCensusSatellite(df_census, df_image):
 	return df_image
 	
 
-def sampleExtractor(data_array, sample_idx, obs_size, axis=None):
+def sampleExtractor(data_array, sample_idx, obs_size, nrows, ncols, axis=None):
 	"""
 	Extracts a sample of images
 	Inputs:
@@ -396,6 +396,7 @@ def sampleExtractor(data_array, sample_idx, obs_size, axis=None):
 		image_sample: numpy array of images. Keras ready!
 	"""
 	print sample_idx, len(sample_idx)
+        print data_array.shape
 	patches, indices = image_slicer(data_array, obs_size, 0.5, nrows, ncols, 4)
 	image_sample = np.take(patches, sample_idx, axis=axis)
 	return image_sample
@@ -429,9 +430,11 @@ def sampleGenerator(obs_size, df_image, channels, nrows,
 	np.random.shuffle(urban_sample_idx)
 	tmp_data = []
 	for i in range(0, 7):
-		image_output_data.append(sampleExtractor(image_array[i,:,:], urban_sample_idx, obs_size, axis=0))
+		image_output_data.append(sampleExtractor(image_array[i,:,:],
+                    urban_sample_idx, obs_size, nrows, ncols, axis=1))
 	image_output_data = np.swapaxes(image_output_data, 0, 1)
-	tmp_pop = sampleExtractor(pop_array, urban_sample_idx, obs_size, axis=0)
+	tmp_pop = sampleExtractor(pop_array, urban_sample_idx, obs_size, nrow,
+                                    ncols, axis=0)
 	for i in range(0, len(urban_sample_idx)):
 		# We take the mean pop density
 		obs_pop = np.mean(tmp_pop[i])
