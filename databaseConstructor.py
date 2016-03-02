@@ -140,7 +140,7 @@ def satelliteImageToDatabase(sat_folder_loc, state_name, year, channels):
 		# getting data
 		print extension
 		if extension == 'B1':
-			ncols, nrows = 50, 50 
+			ncols, nrows = 500, 500 
 			# satellite_gdal.RasterXSize, satellite_gdal.RasterYSize
 			print 'Columns, rows', ncols, nrows
 			rows_grid, cols_grid = np.meshgrid(range(0,ncols), range(0,nrows))
@@ -394,7 +394,8 @@ def sampleExtractor(data_array, sample_idx, obs_size, nrows, ncols, axis=None):
 		image_sample: numpy array of images. Keras ready!
 	"""
 	patches, indices = image_slicer(data_array, obs_size, 0.5, nrows, ncols, 1)
-	image_sample = np.take(patches, sample_idx, axis=axis)
+        print 'patches.shape: ', patches.shape
+        image_sample = np.take(patches, sample_idx, axis=0)
 	return image_sample
 
 def sampleGenerator(obs_size, df_image, channels, nrows, 
@@ -429,7 +430,7 @@ def sampleGenerator(obs_size, df_image, channels, nrows,
 		image_output_data.append(sampleExtractor(image_array[i,:,:],
                     urban_sample_idx, obs_size, nrows, ncols, axis=1))
 	image_output_data = np.swapaxes(image_output_data, 0, 1)
-	tmp_pop = sampleExtractor(pop_array, urban_sample_idx, obs_size, nrow,
+	tmp_pop = sampleExtractor(pop_array, urban_sample_idx, obs_size, nrows,
                                     ncols, axis=0)
 	for i in range(0, len(urban_sample_idx)):
 		# We take the mean pop density

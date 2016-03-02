@@ -24,49 +24,48 @@ f = h5py.File('keras_data/db_Oregon_y_0.hdf5', 'r')
 y_train = np.array(f['data'])
 f.close()
 
-for i in range(1,78):
-	f = h5py.File('keras_data/db_Oregon_X_%d.hdf5' % i, 'r')
-	X_train = np.vstack((X_train, np.array(f['data'])))
-	f.close()
-	f = h5py.File('keras_data/db_Oregon_y_%d.hdf5' % i, 'r')
-	y_train = np.hstack((y_train, f['data']))
-	f.close()
+#for i in range(1,78):
+#	f = h5py.File('keras_data/db_Oregon_X_%d.hdf5' % i, 'r')
+#	X_train = np.vstack((X_train, np.array(f['data'])))
+#	f.close()
+#	f = h5py.File('keras_data/db_Oregon_y_%d.hdf5' % i, 'r')
+#	y_train = np.hstack((y_train, f['data']))
+#	f.close()
 
 ## Initialising with value 0
-f = h5py.File('keras_data/db_Washington_X_0.hdf5', 'r')
-X_test = np.array(f['data'])
-f.close()
-f = h5py.File('keras_data/db_Washington_y_0.hdf5', 'r')
-y_test = np.array(f['data'])
-f.close()
+#f = h5py.File('keras_data/db_Washington_X_0.hdf5', 'r')
+#X_test = np.array(f['data'])
+#f.close()
+#f = h5py.File('keras_data/db_Washington_y_0.hdf5', 'r')
+#y_test = np.array(f['data'])
+#f.close()
 
-for i in range(1,60):
-	print i
-	f = h5py.File('keras_data/db_Washington_X_%d.hdf5' % i, 'r')
-	X_test = np.vstack((X_test, np.array(f['data'])))
-	f.close()
-	f = h5py.File('keras_data/db_Washington_y_%d.hdf5' % i, 'r')
-	y_test = np.hstack((y_test, f['data']))
-	f.close()
+#for i in range(1,60):
+#	print i
+#	f = h5py.File('keras_data/db_Washington_X_%d.hdf5' % i, 'r')
+#	X_test = np.vstack((X_test, np.array(f['data'])))
+#	f.close()
+#	f = h5py.File('keras_data/db_Washington_y_%d.hdf5' % i, 'r')
+#	y_test = np.hstack((y_test, f['data']))
+#	f.close()
 
 # mean normalisation
 mean_value = np.mean(X_train)
 std_value = np.std(X_train)
 
 X_train = X_train - mean_value
-X_test = X_test - mean_value
+#X_test = X_test - mean_value
 
 X_train = X_train / std_value
-X_test = X_test / std_value
+#X_test = X_test / std_value
 
 print mean_value, std_value
-
 
 # normalize target values
 
 # <weighted_log>
 y_train = np.log10(y_train + 1)
-y_test = np.log10(y_test + 1)
+#y_test = np.log10(y_test + 1)
 # </weighted_log>
 
 # training weights
@@ -78,7 +77,7 @@ sample_weights = 1.0 / inv_weight[weight_idx]
 # <weighted>
 max_train = y_train.max()
 y_train /= max_train
-y_test /= max_train
+#y_test /= max_train
 # </weighted>
 
 print 'Max_train', max_train
@@ -104,21 +103,21 @@ model = Sequential()
 # first convolutional pair
 model.add(Convolution2D(256, 5, 5, 
 			border_mode='valid',
-			input_shape = (7, obs_size, obs_size)))
+			input_shape = (4, obs_size, obs_size)))
 model.add(LeakyReLU(alpha=0.001))
 model.add(Dropout(0.3))
 
 # second convolutional pair
-model.add(Convolution2D(128, 3, 3, border_mode='valid'))
-model.add(MaxPooling2D(pool_size=(3, 3)))
-model.add(LeakyReLU(alpha=0.001))
-model.add(Dropout(0.3))
+#model.add(Convolution2D(128, 3, 3, border_mode='valid'))
+#model.add(MaxPooling2D(pool_size=(3, 3)))
+#model.add(LeakyReLU(alpha=0.001))
+#model.add(Dropout(0.3))
 
 # third convolutional pair
-model.add(Convolution2D(128, 3, 3, border_mode='valid'))
-model.add(MaxPooling2D(pool_size=(2, 2)))
-model.add(LeakyReLU(alpha=0.001))
-model.add(Dropout(0.3))
+#model.add(Convolution2D(128, 3, 3, border_mode='valid'))
+#model.add(MaxPooling2D(pool_size=(2, 2)))
+#model.add(LeakyReLU(alpha=0.001))
+#model.add(Dropout(0.3))
 
 # forth convolutional layer 
 #model.add(Convolution2D(128, 3, 3))
@@ -137,13 +136,13 @@ model.add(Activation('relu'))
 model.add(Dropout(0.3))
 
 # second fully connected layer
-model.add(Dense(64))
-model.add(Activation('relu'))
-model.add(Dropout(0.3))
+#model.add(Dense(64))
+#model.add(Activation('relu'))
+#model.add(Dropout(0.3))
 
 # third fully connected layer
-model.add(Dense(25))
-model.add(Activation('linear'))
+#model.add(Dense(25))
+#model.add(Activation('linear'))
 
 # classification fully connected layer
 model.add(Dense(1))
@@ -157,9 +156,9 @@ model.add(Activation('linear'))
 #print('Model loaded.')
 
 # setting sgd optimizer parameters
-#adam = Adam(lr = 0.01, beta_1 = 0.9, beta_2 = 0.999, epsilon = 1e-8)
-sgd = SGD(lr = 1, decay = 1e-6, momentum = 0.9, nesterov = True)
-model.compile(loss='mean_squared_error', optimizer='sgd')
+adam = Adam(lr = 0.01, beta_1 = 0.9, beta_2 = 0.999, epsilon = 1e-8)
+#sgd = SGD(lr = 1, decay = 1e-6, momentum = 0.9, nesterov = True)
+model.compile(loss='mean_squared_error', optimizer='adam')
 
 earlystop = callbacks.EarlyStopping(monitor='val_loss', patience = 10, 
 	verbose=1, mode='min')
@@ -171,37 +170,39 @@ print("Starting training")
 model.fit(X_train, y_train, batch_size=128, validation_split=0.15, sample_weight=sample_weights,
 		show_accuracy=False, callbacks = [earlystop, checkpoint, history])
 print("Evaluating")
-score = model.evaluate(X_test, y_test, batch_size=128)
-predicted = model.predict(X_test)  
+score = model.evaluate(X_train, y_train, batch_size=128)
+#predicted = model.predict(X_test)  
+print score
 
-fig, ax = plt.subplots()
-ax.scatter(y_test, predicted, marker = 'o') 
-ax.set_xlabel('Log normalised population density', fontsize=20)
-ax.set_ylim(0, max(predicted) )
-ax.set_xlim(0, max(y_test))
-ax.set_ylabel('Model prediction', fontsize=20)
-x = np.linspace(0, max(y_test))
-ax.plot(x, x, color='y', linewidth=3)
-plt.savefig('scatter.png')
-plt.cla()
-plt.clf()
 
-pickle.dump( predicted, open( "predicted_normalised.p", "wb" ) )
-pickle.dump( y_test, open( "y_normalised.p", "wb" ) )
-pickle.dump( max_train, open( "max_train.p", "wb" ) )
+#fig, ax = plt.subplots()
+#ax.scatter(y_test, predicted, marker = 'o') 
+#ax.set_xlabel('Log normalised population density', fontsize=20)
+#ax.set_ylim(0, max(predicted) )
+#ax.set_xlim(0, max(y_test))
+#ax.set_ylabel('Model prediction', fontsize=20)
+#x = np.linspace(0, max(y_test))
+#ax.plot(x, x, color='y', linewidth=3)
+#plt.savefig('scatter.png')
+#plt.cla()
+#plt.clf()
 
-y_unnorm = un_normalise(y_test, max_train)
-pred_unnorm = un_normalise(predicted, max_train)
-pickle.dump( pred_unnorm, open( "predicted_unnormalised.p", "wb" ) )
-pickle.dump( y_unnorm, open( "y_unnormalised.p", "wb" ) )
+#pickle.dump( predicted, open( "predicted_normalised.p", "wb" ) )
+#pickle.dump( y_test, open( "y_normalised.p", "wb" ) )
+#pickle.dump( max_train, open( "max_train.p", "wb" ) )
 
-fix, ax = plt.subplots()
-ax.plot(history.history['loss'], label = 'Training loss')
-ax.plot(history.history['val_loss'], label = 'Validation loss')
-ax.set_xlabel('Epoch', fontsize=20)
-ax.set_ylabel('RMSE (people per km$^2$)', fontsize=20)
-plt.legend()
-plt.savefig('loss.png')
+#y_unnorm = un_normalise(y_test, max_train)
+#pred_unnorm = un_normalise(predicted, max_train)
+#pickle.dump( pred_unnorm, open( "predicted_unnormalised.p", "wb" ) )
+#pickle.dump( y_unnorm, open( "y_unnormalised.p", "wb" ) )
+
+#fix, ax = plt.subplots()
+#ax.plot(history.history['loss'], label = 'Training loss')
+#ax.plot(history.history['val_loss'], label = 'Validation loss')
+#ax.set_xlabel('Epoch', fontsize=20)
+#ax.set_ylabel('RMSE (people per km$^2$)', fontsize=20)
+#plt.legend()
+#plt.savefig('loss.png')
 
 print 'Printing History'
 print history.history
