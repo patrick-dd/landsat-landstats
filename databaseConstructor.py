@@ -82,7 +82,7 @@ def pointWithinPolygonPop(idx, points, polygons, pop):
 		count += 1
 	return GeoDataFrame(pixelPoint_db)
 
-def pointWithinPolygon(idx, points, polygons):
+def pointWithinPolygonUrban(idx, points, polygons):
 	"""
 	Finds whether a pixel is urban or not
 	This is useful for generating sample weights 
@@ -97,9 +97,10 @@ def pointWithinPolygon(idx, points, polygons):
 	count = 0
 	for pixel in points:
 		temp_polygon = None
-		temp_urban = None
-		for j in idx.intersection((pixel.x, pixel.y)):
+		temp_urban = 0
+		for j in idx.intersection((pixel.y, pixel.x)):
 			if pixel.within(polygons[j]):
+                                print 'YAY'
 				temp_polygon = polygons[j]
 				temp_urban = 1
 				break
@@ -140,8 +141,8 @@ def satelliteImageToDatabase(sat_folder_loc, state_name, year, channels):
 		# getting data
 		print extension
 		if extension == 'B1':
-			ncols, nrows = 500, 500 
-			# satellite_gdal.RasterXSize, satellite_gdal.RasterYSize
+			ncols = satellite_gdal.RasterXSize / 20
+                        nrows = satellite_gdal.RasterYSize / 20
 			print 'Columns, rows', ncols, nrows
 			rows_grid, cols_grid = np.meshgrid(range(0,ncols), range(0,nrows))
 			cols_grid, rows_grid = rows_grid.flatten(), cols_grid.flatten()
@@ -156,7 +157,7 @@ def satelliteImageToDatabase(sat_folder_loc, state_name, year, channels):
 			location_series = parmap.starmap(point_wrapper, 
 											zip(cols_grid, rows_grid), 
 												processes=8)
-			# pixel data
+                        # pixel data
 			band = satellite_gdal.GetRasterBand(1)
 			array = band.ReadAsArray()
 			band_series = parmap.starmap(array_wrapper, 
@@ -174,11 +175,6 @@ def satelliteImageToDatabase(sat_folder_loc, state_name, year, channels):
 			#band_series = np.array([array[row][col] for (col, row) in
 			#					 zip(cols_grid, rows_grid)])
 			data.append(band_series)
-	print len(location_series)
-	print len(data[0])
-	print len(data[1])
-	print len(data[2])
-	print len(data[3])
 	df_image = GeoDataFrame({
 		'location': location_series,
 		'B1': data[0],
@@ -189,6 +185,7 @@ def satelliteImageToDatabase(sat_folder_loc, state_name, year, channels):
 		#'B6_VCID_2': data[5],
 		#'B7': data[6],
 		})
+        print df_image.head()
 	return df_image, nrows, ncols, satellite_gdal
 
 def urbanDatabase(urban_folder_loc, state_code):
@@ -214,15 +211,20 @@ def satUrbanDatabase(df_urban, df_image):
 		df_image: combined GeoDataFrame
 	"""
 	urban_blocks = np.array(df_urban['geometry'])
-	idx = spatialIndex(urban_blocks)
+        print 'Amount of urban blocks: ', len(urban_blocks)
+        idx = spatialIndex(urban_blocks)
 	pixels_location = df_image['location']
-	pixelPoint_urban = pointWithinPolygon(idx, pixels_location, urban_blocks)	
-	pixelPoint_urban.columns = ['count','poly', 'urban', 
-									 'latitude', 'longitude']
+        print pixels_location[0:10]
+	pixelPoint_urban = pointWithinPolygonUrban(idx, pixels_location, urban_blocks)	
+	pixelPoint_urban.columns = ['count','poly', 'urban', 'latitude', 'longitude']
 	df_image['urban'] = pixelPoint_urban['urban']
 	df_image['latitude_u'] = pixelPoint_urban['latitude']
 	df_image['longitude_u'] = pixelPoint_urban['longitude']
-	return df_image
+        print 'Does the urban indicator work'
+        for element in df_image['urban']:
+            if element == 1:
+                print element, df_image['latitude_u'], df_image['longitude_u']
+        return df_image
 
 def image_slicer(image, obs_size, overlap, nrows, ncols, slice_depth):
 	"""
@@ -239,15 +241,13 @@ def image_slicer(image, obs_size, overlap, nrows, ncols, slice_depth):
 	"""
 	patches = []
 	step = int(obs_size * overlap)
-	print step
 	indices = []
 	if slice_depth == 1:
 		for y in range(0, nrows, step):
 			for x in range(0, ncols, step):
-				mx = min(x+obs_size, ncols)
+                                mx = min(x+obs_size, ncols)
 				my = min(y+obs_size, nrows)
-				print x, mx, y, my
-				tile = image[ x: mx, y: my ]
+                                tile = image[ y: my, x: mx ]
 				if tile.shape == (obs_size, obs_size):
 					patches.append(tile)
 					indices.append((x, y))
@@ -256,8 +256,7 @@ def image_slicer(image, obs_size, overlap, nrows, ncols, slice_depth):
 			for x in range(0, ncols, step):
 				mx = min(x+obs_size, ncols)
 				my = min(y+obs_size, nrows)
-				print x, mx, y, my
-				tile = image[ :, x: mx, y: my ]
+                                tile = image[ :, y : my, x: mx ]
 				if tile.shape == (slice_depth, obs_size, obs_size):
 					patches.append(tile)
 					indices.append((x, y))
@@ -292,17 +291,22 @@ def sampling(sampling_rate, obs_size, nrows, ncols, df_image, satellite_gdal):
 	urban_array = df_image['urban'].fillna(0)
 	urban_array = np.array(urban_array).reshape((nrows, ncols))
 	print 'extract patches'
+	print urban_array.shape
 	urban_patches, u_indices = image_slicer(
 					urban_array, obs_size, 0.5, nrows, ncols, 1)
 	print 'counting urban'
 	urban_count = [np.sum(patch) for patch in urban_patches]
+        print 'Pre slicing max min'
+        print urban_array.max()
+        print urban_array.min()
+        print 'After slicing'
+        print urban_count.max()
+        print urban_count.min()
 	df_sample = pd.DataFrame(urban_count)
 	# Getting the locations
 	print 'get locations'
 	mid_point = obs_size / 2
 	pool = Pool(processes = 8)
-	print np.array(u_indices).shape
-        print u_indices
 	cols_grid = pool.map(adder, u_indices[:,0])
 	rows_grid = pool.map(adder, u_indices[:,1])
 	print 'location series'
@@ -394,8 +398,8 @@ def sampleExtractor(data_array, sample_idx, obs_size, nrows, ncols, axis=None):
 		image_sample: numpy array of images. Keras ready!
 	"""
 	patches, indices = image_slicer(data_array, obs_size, 0.5, nrows, ncols, 1)
-        print 'patches.shape: ', patches.shape
-        image_sample = np.take(patches, sample_idx, axis=0)
+	print 'patches.shape: ', patches.shape
+	image_sample = np.take(patches, sample_idx, axis=0)
 	return image_sample
 
 def sampleGenerator(obs_size, df_image, channels, nrows, 
@@ -428,10 +432,10 @@ def sampleGenerator(obs_size, df_image, channels, nrows,
 	tmp_data = []
 	for i in range(0, 4):
 		image_output_data.append(sampleExtractor(image_array[i,:,:],
-                    urban_sample_idx, obs_size, nrows, ncols, axis=1))
+					urban_sample_idx, obs_size, nrows, ncols, axis=1))
 	image_output_data = np.swapaxes(image_output_data, 0, 1)
 	tmp_pop = sampleExtractor(pop_array, urban_sample_idx, obs_size, nrows,
-                                    ncols, axis=0)
+									ncols, axis=0)
 	for i in range(0, len(urban_sample_idx)):
 		# We take the mean pop density
 		obs_pop = np.mean(tmp_pop[i])
