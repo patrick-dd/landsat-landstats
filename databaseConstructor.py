@@ -146,7 +146,7 @@ def satelliteImageToDatabase(sat_folder_loc, state_name, year, channels):
 			cols_grid, rows_grid = rows_grid.flatten(), cols_grid.flatten()
 			# getting a series of lat lon points for each pixel
 			print 'Getting geo data'
-			print point_wrapper(cols_grid[100], rows_grid[100])
+			print point_wrapper(cols_grid[100:110], rows_grid[100:110])
 			geotransform = satellite_gdal.GetGeoTransform()
 			print 'Getting locations'
 			location_series = parmap.starmap(pixelToCoordinates, 
@@ -157,7 +157,7 @@ def satelliteImageToDatabase(sat_folder_loc, state_name, year, channels):
 			location_series = parmap.starmap(point_wrapper, 
 												zip(cols_grid, rows_grid), 
 												processes=8)
-			print location_series[0:10]
+			print location_series[]
 			# pixel data
 			band = satellite_gdal.GetRasterBand(1)
 			array = band.ReadAsArray()
