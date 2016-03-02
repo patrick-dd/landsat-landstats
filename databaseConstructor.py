@@ -314,7 +314,7 @@ def sampling(sampling_rate, obs_size, nrows, ncols, df_image, satellite_gdal):
 	df_sample['location'] = location_series
 	# Creating sample weights 
 	seed = 1996
-	print df_sample[0].hist()
+	print df_sample[0].hist
 	urban_rank = df_sample[0].rank(ascending=False)
 	# weighting the urban areas way more heavily
 	urban_rank = [ u**5 for u in urban_rank ]
@@ -325,9 +325,7 @@ def sampling(sampling_rate, obs_size, nrows, ncols, df_image, satellite_gdal):
 			int(len(df_sample[0]) * sampling_rate), 
 			weights=df_sample['weight'], replace=True)
 	urban_sample_idx = np.array(urban_sample.index.values)
-	print df_sample.shape
 	df_sample = df_image.ix[urban_sample_idx]
-	print df_sample.shape
 	urban_sample_idx.sort()
 	return urban_sample_idx, df_sample
 
@@ -427,7 +425,7 @@ def sampleGenerator(obs_size, df_image, channels, nrows,
 	image_array = np.array(image_array)
 	np.random.shuffle(urban_sample_idx)
 	tmp_data = []
-	for i in range(0, 7):
+	for i in range(0, 4):
 		image_output_data.append(sampleExtractor(image_array[i,:,:],
                     urban_sample_idx, obs_size, nrows, ncols, axis=1))
 	image_output_data = np.swapaxes(image_output_data, 0, 1)
