@@ -152,12 +152,11 @@ def satelliteImageToDatabase(sat_folder_loc, state_name, year, channels):
 			print 'Getting locations'
 			location_series = parmap.starmap(pixelToCoordinates, 
 											zip(cols_grid, rows_grid), 
-												geotransform, processes=8)
+												geotransform, processes=2)
 			print 'Converting to Points'
-			location_series = parmap.starmap(point_wrapper, 
-											zip(cols_grid, rows_grid), 
-												processes=8)
-            print location_series[0:10]
+			location_series = parmap.starmap(
+                    point_wrapper, zip(cols_grid, rows_grid), 
+					processes=2)
             # pixel data
 			band = satellite_gdal.GetRasterBand(1)
 			array = band.ReadAsArray()
