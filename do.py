@@ -26,6 +26,6 @@ obs_size = 32					# size of image
 
 if __name__ == "__main__":
     databaseConstruction(census_folder_loc, census_shapefile, urban_folder_loc,
-		sat_folder_loc, save_folder_loc, state_name, state_code, year, channels,
-		file_size, sample_rate, obs_size)
+		sat_folder_loc, save_folder_loc, state_name, state_code, year, 
+                channels, file_size, sample_rate, obs_size)
 
