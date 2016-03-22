@@ -21,8 +21,6 @@ The files of interest are:
  - `database_constructor.py`: merges satellite images with population
    databases (shapefiles)
  - `db_test.py`: a testing file for `database_constructor.py`
- - `spatial.ipynb`: a worked through example of database construction
- - `ee.ipynb`: downloads LANDSAT 7 TOA images
     
 In addition to the usual, the analysis relies on these packages 
 
