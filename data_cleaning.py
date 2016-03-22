@@ -147,29 +147,6 @@ class databaseConstructor:
             pixelPoint_db.append([temp_polygon, temp_pop, pixel.x, pixel.y])
         return GeoDataFrame(pixelPoint_db)
 
-    def point_within_polygon_urban(self, idx, points, polygons):
-        """
-        Finds whether a pixel is urban or not
-        This is useful for generating sample weights 
-        Inputs:
-            (rtree) idx: an Rtree spatial index instance
-            (array of shapely points) points 
-            (array of shapely polygons) polygons
-        Returns:
-            A GeoDataFrame with points, polycounts and an urban dummy 
-        """
-        pixelPoint_db = []
-        for pixel in points:
-            temp_polygon = None
-            temp_urban = 0
-            for j in idx.intersection((pixel.y, pixel.x)):
-                if pixel.within(polygons[j]):
-                    temp_polygon = polygons[j]
-                    temp_urban = 1
-                    break
-            pixelPoint_db.append([temp_polygon, temp_urban, pixel.x, pixel.y])
-        return GeoDataFrame(pixelPoint_db)
-
     def point_wrapper(self, x, y):
         """
         A wrapper to use the point function in parallel 
@@ -237,34 +214,49 @@ class databaseConstructor:
         self.df_image = GeoDataFrame({'location': location_series})
         for count, extension in enumerate(self.channels):
             self.df_image[extension] = data[count]
-    
-    def urban_database(self):
+ 
+    def census_database(self):
         """
-        
-        Creates the GeoDataFrame for urbanness
-        
-        """
-        df_urban = GeoDataFrame.from_file(
-                    self.urban_folder_loc+self.urban_shape_file)
-        self.df_urban = df_urban[(
-                    df_urban['NAME10'].str.contains(
-                        self.state_code, case=True))]
-    
-    def sat_urban_database(self):
+        Gets population density from census data
+        Inputs:
+        census_folder_loc: location of data (string)    
+        census_shapefile: name of shapefile (string)
+        Returns: 
+            df_census: GeoDataFrame with census information
+        """ 
+        ## Importing shapefile 
+        self.df_census = GeoDataFrame.from_file(
+                self.census_folder_loc + self.census_shapefile) 
+        # It turns out the earth isn't flat 
+        # Getting area in km**2 
+        area_sq_degrees = self.df_census['geometry'] 
+        area_sq_km = [] 
+        for region in area_sq_degrees: 
+            geom_area = ops.transform( partial( 
+                pyproj.transform, pyproj.Proj(init='EPSG:4326'), 
+                pyproj.Proj( proj='aea', 
+                    lat1=region.bounds[1], lat2=region.bounds[3])), region) 
+        area = geom_area.area / 1000000.0  #convert to km2
+        area_sq_km.append( area )
+        self.df_census['area'] = area_sq_km
+        self.df_census['density'] = \
+                self.df_census['POP10'] / self.df_census['area'] 
+
+    def sat_census_database(self):
         """
         
         Combines satellite and urban database construction
         
         """
-        self.urban_blocks = np.array(self.df_urban['geometry'])
-        print 'Amount of urban blocks: ', len(self.urban_blocks)
-        self.idx = self.spatialIndex(self.urban_blocks)
-        pixel_point_urban = self.point_within_polygon_urban(
-                self.idx, self.location_series, self.urban_blocks) 
-        pixel_point_urban.columns = ['poly', 'urban', 'latitude', 'longitude']
-        self.df_image['urban'] = pixel_point_urban['urban']
-        self.df_image['latitude_u'] = pixel_point_urban['latitude']
-        self.df_image['longitude_u'] = pixel_point_urban['longitude']
+        self.census_blocks = np.array(self.df_census['geometry'])
+        print 'Amount of urban blocks: ', len(self.urban_census)
+        self.idx = self.spatialIndex(self.census_blocks)
+        pixel_point_urban = self.point_within_polygon_pop(
+                self.idx, self.location_series, self.census_blocks) 
+        pixel_point_urban.columns = ['poly', 'pop', 'latitude', 'longitude']
+        self.df_image['pop_density'] = pixel_point_pop['pop']
+        self.df_image['latitude_u'] = pixel_point_pop['latitude']
+        self.df_image['longitude_u'] = pixel_point_pop['longitude']
     
     def image_slicer(self, image):
         """
@@ -311,97 +303,7 @@ class databaseConstructor:
         """
         return x + (self.obs_size / 2)
 
-    def sampling(self):
-        """
-        Constructs a weighted sample of images from the GeoDataFrame
-        
-        Returns:
-            (array) urban_sample_idx: index of sampled images 
-            (geodataframe) df_sample: sampled images 
-        
-        Note: Keras uses the last x percent of data in cross validation 
-            Have to shuffle here to ensure that the last ten percent isn't just
-            the southern most rows of information
-        """
-        # Getting the sum of urban pixels for each patch
-        urban_array = self.df_image['urban'].fillna(0)
-        urban_array = np.array(urban_array).reshape((self.nrows, self.ncols))
-        print 'extract patches'
-        urban_patches, u_indices = self.image_slicer(urban_array)
-        print 'get locations for individual frames'
-        pool = Pool(self.processes)
-        cols_grid = pool.map(self.adder, u_indices[:,0])
-        rows_grid = pool.map(self.adder, u_indices[:,1])
-        self.frame_location_series = parmap.starmap(
-                pixelToCoordinates,
-                zip(cols_grid, rows_grid), self.geotransform, processes=8)
-        print 'converting locations to Points'
-        self.frame_location_series = \
-                pool.map(Point, self.frame_location_series)
-        print 'counting urban'
-        urban_count = np.array([np.sum(patch) for patch in urban_patches])
-        self.df_sample = pd.DataFrame(urban_count, columns='urban_count')
-        # Getting the locations
-        self.df_sample['location'] = self.frame_location_series
-        # Creating sample weights 
-        seed = 1996
-        urban_sample = self.df_sample.sample(
-                frac=self.sample_rate,
-                replace=True,
-                weights='urban_count',
-                random_state = seed)
-        self.urban_sample_idx = np.array(urban_sample.index.values)
-        self.df_sample = df_image.ix[urban_sample_idx]
-           
-    def census_database(self):
-        """
-        Gets population density from census data
-        Inputs:
-        census_folder_loc: location of data (string)    
-        census_shapefile: name of shapefile (string)
-        Returns: 
-            df_census: GeoDataFrame with census information
-        """ 
-        ## Importing shapefile 
-        self.df_census = GeoDataFrame.from_file(
-                self.census_folder_loc + self.census_shapefile) 
-        # It turns out the earth isn't flat 
-        # Getting area in km**2 
-        area_sq_degrees = self.df_census['geometry'] 
-        area_sq_km = [] 
-        for region in area_sq_degrees: 
-            geom_area = ops.transform( partial( 
-                pyproj.transform, pyproj.Proj(init='EPSG:4326'), 
-                pyproj.Proj( proj='aea', 
-                    lat1=region.bounds[1], lat2=region.bounds[3])), region) 
-        area = geom_area.area / 1000000.0  #convert to km2
-        area_sq_km.append( area )
-        self.df_census['area'] = area_sq_km
-        self.df_census['density'] = \
-                self.df_census['POP10'] / self.df_census['area'] 
-
-    def merge_census_satellite(self): 
-        """ 
-        
-        Merges census data with satellite data 
-        
-        This is a spatial join. Connecting pixels of satellite data
-        to polygons of census data
-
-        """
-        blocks = self.df_census['geometry'] 
-        pop = self.df_census['density']
-        points = self.df_image['location'] 
-        idx = self.spatialIndex(blocks)
-        pixel_information = \
-                self.point_within_polygon_pop(idx, points, blocks, pop)
-        pixel_information.columns = \
-                ['poly', 'pop_density', 'latitude', 'longitude']
-        self.df_image['pop_density'] = pixel_information['pop_density']
-        self.df_image['latitude'] = pixel_information['latitude']
-        self.df_image['longitude'] = pixel_information['longitude']
-
-    def sample_extractor(data_array, axis=None):
+    def sample_extractor(self, data_array, axis=None):
         """
 
         Extracts a sample of images
@@ -410,36 +312,59 @@ class databaseConstructor:
             (array) image_sample, Keras ready numpy array of images
         
         """
-        patches, indices = image_slicer(data_array)
+        patches, indices = self.image_slicer(data_array)
         print 'patches.shape: ', patches.shape
         self.image_sample = np.take(
-                patches, self.urban_sample_idx, axis=0,
+                patches, self.sample_idx, axis=0,
                 mode = 'raise')
-
-    def sample_generator_pop(self):
+    
+    def sampling(self):
         """
+        Constructs a weighted sample of images from the GeoDataFrame
         
-        Constructs a sample of observations that Keras can play with 
-        We take the mean population density of each image 
+        Returns:
+            (array) sample_idx: index of sampled images 
         
+        Note: Keras uses the last x percent of data in cross validation 
+            Have to shuffle here to ensure that the last ten percent isn't just
+            the southern most rows of information
         """
-        # getting population data
-        pop_output_data = []
-        pop_array = self.df_image['pop_density'].fillna(0)
-        pop_array = pop_array.reshape((self.nrows, self.ncols))
-        tmp_pop = sample_extractor(pop_array, axis=0)
-        for i in range(0, len(urban_sample_idx)):
-        # We take the mean pop density
-            obs_pop = np.mean(tmp_pop[i])
-            pop_output_data.append(obs_pop)
-        self.pop_output_data = np.nan_to_num(np.array(pop_output_data))
-        
+        # Getting the sum of urban pixels for each patch
+        self.pop_array = self.df_image['pop_density'].fillna(0)
+        self.pop_array = np.array(
+                self.pop_array).reshape((self.nrows, self.ncols))
+        print 'extract patches'
+        pop_patches, pop_indices = self.image_slicer(self.pop_array)
+        print 'get locations for individual frames'
+        pool = Pool(self.processes)
+        cols_grid = pool.map(self.adder, pop_indices[:,0])
+        rows_grid = pool.map(self.adder, pop_indices[:,1])
+        self.frame_location_series = parmap.starmap(
+                pixelToCoordinates,
+                zip(cols_grid, rows_grid), self.geotransform, processes=8)
+        print 'converting locations to Points'
+        self.frame_location_series = \
+                pool.map(Point, self.frame_location_series)
+        print 'counting urban'
+        pop_count = np.array([np.mean(patch) for patch in pop_patches])
+        self.df_sample = pd.DataFrame(pop_count, columns='pop_ave')
+        # Getting the locations
+        self.df_sample['location'] = self.frame_location_series
+        # Creating sample weights 
+        seed = 1996
+        self.pop_mean_sample = self.df_sample.sample(
+                frac=self.sample_rate,
+                replace=True,
+                weights='pop_ave',
+                random_state = seed)
+        self.sample_idx = np.array(self.pop_mean_sample.index.values)
+    
     def sample_generator_sat(self):
         """
         
         Constructs a sample of observations that Keras can play with 
         
-       """
+        """
         # satellite image data
         image_array = []
         for channel in self.channels:
@@ -451,6 +376,22 @@ class databaseConstructor:
         image_array = np.swapaxes(image_array, 0, 1)
         self.image_output_data = np.array(image_array)
     
+    def sample_generator_pop(self):
+        """
+        
+        Constructs a sample of observations that Keras can play with 
+        We take the mean population density of each image 
+        
+        """
+        # getting population data
+        pop_output_data = []
+        tmp_pop = self.sample_extractor(self.pop_array, axis=0)
+        for i in range(0, len(self.sample_idx)):
+            # We take the mean pop density
+            obs_pop = np.mean(tmp_pop[i])
+            pop_output_data.append(obs_pop)
+        self.pop_output_data = np.nan_to_num(np.array(pop_output_data))
+
     def saveFiles_X(X, file_size, save_folder_loc, state_name):
         """
         Saves the image information
