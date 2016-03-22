@@ -82,8 +82,9 @@ class test_for_db_construction(unittest.TestCase):
         print 'Testing urban dataframe creator'
         test_instance = databaseConstructor(
                 census_folder_loc, census_shapefile, urban_folder_loc,
-		        sat_folder_loc, save_folder_loc, state_name, state_code,
-                year, channels, file_size, sample_rate, obs_size, processes)
+		        urban_shapefile, sat_folder_loc, save_folder_loc, state_name, 
+                state_code, year, channels, file_size, sample_rate, obs_size, 
+                slice_depth, processes)
         test_shapes_n = [
                 Polygon([[0.0, 0.0], [0.0, 1.0], [1.0, 1.0], [1.0, 0.0]]),\
                 None]
@@ -100,7 +101,47 @@ class test_for_db_construction(unittest.TestCase):
                 idx, test_points, test_shapes)
         self.assertEqual( test_data.equals(test_instance_df), True )
 
+    def test_adder(self):
+        print 'Testing adder'
+        test_instance = databaseConstructor(
+                census_folder_loc, census_shapefile, urban_folder_loc,
+		        urban_shapefile, sat_folder_loc, save_folder_loc, state_name, 
+                state_code, year, channels, file_size, sample_rate, obs_size, 
+                slice_depth, processes)
+        output = test_instance.adder( 10 )
+        self.assertEqual( output, 26 )
 
-
+    def test_slicer(self):
+        print 'Testing the image slicer '
+        test_instance = databaseConstructor(
+                census_folder_loc, census_shapefile, urban_folder_loc,
+		        urban_shapefile, sat_folder_loc, save_folder_loc, state_name, 
+                state_code, year, channels, file_size, sample_rate, obs_size, 
+                slice_depth, processes)
+ 
+    def test_extractor(self):
+        print 'Testing the patch extractor '
+        test_instance = databaseConstructor(
+                census_folder_loc, census_shapefile, urban_folder_loc,
+		        urban_shapefile, sat_folder_loc, save_folder_loc, state_name, 
+                state_code, year, channels, file_size, sample_rate, obs_size, 
+                slice_depth, processes)
+ 
+    def test_sample_generator_sat(self):
+        print 'Testing the sample generator '
+        test_instance = databaseConstructor(
+                census_folder_loc, census_shapefile, urban_folder_loc,
+		        urban_shapefile, sat_folder_loc, save_folder_loc, state_name, 
+                state_code, year, channels, file_size, sample_rate, obs_size, 
+                slice_depth, processes)
+        
+    def test_sample_generator_pop(self):
+        print 'Testing the sample generator for population'
+        test_instance = databaseConstructor(
+                census_folder_loc, census_shapefile, urban_folder_loc,
+		        urban_shapefile, sat_folder_loc, save_folder_loc, state_name, 
+                state_code, year, channels, file_size, sample_rate, obs_size, 
+                slice_depth, processes)
+ 
 if __name__ == "__main__":
     unittest.main()

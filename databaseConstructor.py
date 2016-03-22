@@ -78,6 +78,13 @@ class databaseConstructor:
                                 + self.census_shapefile ):
             sys.exit('Error: File ' + self.census_folder_loc + '/' 
                     + self.census_shapefile + ' does not exist')
+        self.filename = self.sat_folder_loc + self.state_name + \
+                       '_' + self.year + '_B1.tif'
+        # testing whether files exist
+        if not os.path.exists( self.filename ):
+                sys.exit('Error: File ' + self.filename + 
+                        ' does not exist')
+        self.satellite_gdal = gdal.Open(self.filename)
 
     def pixel_to_coordinates(self, column, row):
         """
@@ -167,7 +174,7 @@ class databaseConstructor:
         """
         A wrapper to use the point function in parallel 
         """
-        return Point((x, y))
+        return Point(x, y)
 
     def array_wrapper(self, col, row, array):
         """
@@ -181,15 +188,14 @@ class databaseConstructor:
         Extracts the location of each pixel in the satellite image
 
         """
-        self.ncols = self.satellite_gdal.RasterXSize / 50
-        self.nrows = self.satellite_gdal.RasterYSize / 50
+        self.ncols = self.satellite_gdal.RasterXSize 
+        self.nrows = self.satellite_gdal.RasterYSize
         print 'Columns, rows', self.ncols, self.nrows
         rows_grid, cols_grid = np.meshgrid(
-                    range(4 * ncols, 5 * ncols), 
-                    range(2 * nrows, 3 * nrows))
+                    range(0 * self.ncols, 1 * self.ncols), 
+                    range(0 * self.nrows, 1 * self.nrows))
         cols_grid, rows_grid = rows_grid.flatten(), cols_grid.flatten()
         # getting a series of lat lon points for each pixel
-        print 'Getting geo data'
         self.geotransform = satellite_gdal.GetGeoTransform()
         print 'Getting locations'
         self.location_series = parmap.starmap(
@@ -212,17 +218,10 @@ class databaseConstructor:
         """
         data = []
         count = 0
-        self.filename = self.sat_folder_loc + self.state_name + \
-                       '_' + self.year + '_B1.tif'
-        # testing whether files exist
-        if not os.path.exists( self.filename ):
-                sys.exit('Error: File ' + self.filename + 
-                        ' does not exist')
-        self.satellite_gdal = gdal.Open(self.filename)
         self.get_location()
-        for extension in channels:
+        for extension in self.channels:
             self.filename = self.sat_folder_loc + self.state_name + \
-                        '_' + self.year + '_' + self.extension + '.tif'
+                        '_' + self.year + '_' + extension + '.tif'
             # testing whether files exist
             if not os.path.exists( self.filename ):
                 sys.exit('Error: File ' + self.filename + 
@@ -235,16 +234,9 @@ class databaseConstructor:
                     array_wrapper, zip(cols_grid, rows_grid), 
                     array, self.processes)
             data.append(band_series)
-        self.df_image = GeoDataFrame({
-        'location': location_series,
-        'B1': data[0],
-        'B2': data[1],
-        'B3': data[2],
-        'B4': data[3],
-        #'B5': data[4],
-        #'B6_VCID_2': data[5],
-        #'B7': data[6],
-        })
+        self.df_image = GeoDataFrame({'location': location_series})
+        for count, extension in enumerate(self.channels):
+            self.df_image[extension] = data[count]
     
     def urban_database(self):
         """
@@ -255,7 +247,8 @@ class databaseConstructor:
         df_urban = GeoDataFrame.from_file(
                     self.urban_folder_loc+self.urban_shape_file)
         self.df_urban = df_urban[(
-                    df_urban['NAME10'].str.contains(self.state_code, case=True))]
+                    df_urban['NAME10'].str.contains(
+                        self.state_code, case=True))]
     
     def sat_urban_database(self):
         """
@@ -273,17 +266,15 @@ class databaseConstructor:
         self.df_image['latitude_u'] = pixel_point_urban['latitude']
         self.df_image['longitude_u'] = pixel_point_urban['longitude']
     
-    def image_slicer(image):
+    def image_slicer(self, image):
         """
+        
         Cuts the larger satellite image into smaller images 
         A less intense version of extract_patches_2d
-        Inputs:
-        - image: the geotiff image 
-        - obs_size: the observation size 
-        - overlap: proportion of image you want to overlap
-        Returns:
-        - patches: the tiles
-        - indices: index of the nw corner of each patch 
+        
+        Input:
+            (2d array) satellite image or population map
+
         """
         self.patches = []
         step = int(self.obs_size * self.overlap)
@@ -312,27 +303,21 @@ class databaseConstructor:
 
     def adder(self, x):
         """
-        Adds two variables. Useful in parallelising operation
+       
+        Wrapper for parallelisation
+
         Takes the north west corner of an image and returns the centroid
-        Inputs: 
-        x: north west corner
-        midpoint: half the length of an image    
-        Returns:
-        image midpoint
+        
         """
         return x + (self.obs_size / 2)
 
     def sampling(self):
         """
         Constructs a weighted sample of images from the GeoDataFrame
-        Inputs:
-        sampling_rate: proportion of images sampled  (float)
-        obs_size: model uses images of size obs_size**2 ()
-        nrows, ncols: dimensions of satellite data 
-        df_image: GeoDataFrame with information 
+        
         Returns:
-        urban_sample_idx: index of sampled images 
-        df_sample: sampled images 
+            (array) urban_sample_idx: index of sampled images 
+            (geodataframe) df_sample: sampled images 
         
         Note: Keras uses the last x percent of data in cross validation 
             Have to shuffle here to ensure that the last ten percent isn't just
@@ -341,48 +326,32 @@ class databaseConstructor:
         # Getting the sum of urban pixels for each patch
         urban_array = self.df_image['urban'].fillna(0)
         urban_array = np.array(urban_array).reshape((self.nrows, self.ncols))
-        print 'Pre slicing max min'
-        print urban_array.max()
-        print urban_array.min()
         print 'extract patches'
         urban_patches, u_indices = self.image_slicer(urban_array)
-        print 'counting urban'
-        urban_count = np.array([np.sum(patch) for patch in urban_patches])
-        print 'After slicing'
-        print urban_count.max()
-        print urban_count.min()
-        df_sample = pd.DataFrame(urban_count)
-        # Getting the locations
         print 'get locations for individual frames'
-        mid_point = self.obs_size / 2
         pool = Pool(self.processes)
         cols_grid = pool.map(self.adder, u_indices[:,0])
         rows_grid = pool.map(self.adder, u_indices[:,1])
-        print 'location series'
         self.frame_location_series = parmap.starmap(
                 pixelToCoordinates,
                 zip(cols_grid, rows_grid), self.geotransform, processes=8)
-        print 'Converting to Points'
+        print 'converting locations to Points'
         self.frame_location_series = \
                 pool.map(Point, self.frame_location_series)
-        df_sample['location'] = location_series
+        print 'counting urban'
+        urban_count = np.array([np.sum(patch) for patch in urban_patches])
+        self.df_sample = pd.DataFrame(urban_count, columns='urban_count')
+        # Getting the locations
+        self.df_sample['location'] = self.frame_location_series
         # Creating sample weights 
         seed = 1996
-        print df_sample[0].hist
-        urban_rank = df_sample[0].rank(ascending=False)
-        # weighting the urban areas way more heavily
-        urban_rank = [ u**5 for u in urban_rank ]
-        df_sample['rank'] = urban_rank
-        sumrank = df_sample['rank'].sum()
-        df_sample['weight'] = (df_sample['rank']) / sumrank
-        urban_sample = df_sample[0].sample(
-            int(len(df_sample[0]) * sampling_rate), 
-            weights=df_sample['weight'], replace=True)
+        urban_sample = self.df_sample.sample(
+                frac=self.sample_rate,
+                replace=True,
+                weights='urban_count',
+                random_state = seed)
         self.urban_sample_idx = np.array(urban_sample.index.values)
         self.df_sample = df_image.ix[urban_sample_idx]
-        self.urban_sample_idx.sort()
-        # shuffling indices for Keras cross validation
-        np.random.shuffle(self.urban_sample_idx)
            
     def census_database(self):
         """
@@ -394,11 +363,11 @@ class databaseConstructor:
             df_census: GeoDataFrame with census information
         """ 
         ## Importing shapefile 
-        self.df_census = GeoDataFrame.from_file(self.census_folder_loc + 
-                                        self.census_shapefile) 
+        self.df_census = GeoDataFrame.from_file(
+                self.census_folder_loc + self.census_shapefile) 
         # It turns out the earth isn't flat 
         # Getting area in km**2 
-        area_sq_degrees = df_census['geometry'] 
+        area_sq_degrees = self.df_census['geometry'] 
         area_sq_km = [] 
         for region in area_sq_degrees: 
             geom_area = ops.transform( partial( 
@@ -408,21 +377,21 @@ class databaseConstructor:
         area = geom_area.area / 1000000.0  #convert to km2
         area_sq_km.append( area )
         self.df_census['area'] = area_sq_km
-        self.df_census['density'] = self.df_census['POP10'] /\
-                self.df_census['area'] 
+        self.df_census['density'] = \
+                self.df_census['POP10'] / self.df_census['area'] 
 
     def merge_census_satellite(self): 
         """ 
+        
         Merges census data with satellite data 
-        Inputs: 
-            df_census: census GeoDataFrame
-            df_image: image GeoDataFrame
-        Returns: 
-            df_image: image GeoDataFrame with census data
+        
+        This is a spatial join. Connecting pixels of satellite data
+        to polygons of census data
+
         """
         blocks = self.df_census['geometry'] 
-        points = self.df_image['location'] 
         pop = self.df_census['density']
+        points = self.df_image['location'] 
         idx = self.spatialIndex(blocks)
         pixel_information = \
                 self.point_within_polygon_pop(idx, points, blocks, pop)
@@ -443,7 +412,9 @@ class databaseConstructor:
         """
         patches, indices = image_slicer(data_array)
         print 'patches.shape: ', patches.shape
-        self.image_sample = np.take(patches, self.urban_sample_idx, axis=0)
+        self.image_sample = np.take(
+                patches, self.urban_sample_idx, axis=0,
+                mode = 'raise')
 
     def sample_generator_pop(self):
         """
@@ -456,7 +427,7 @@ class databaseConstructor:
         pop_output_data = []
         pop_array = self.df_image['pop_density'].fillna(0)
         pop_array = pop_array.reshape((self.nrows, self.ncols))
-        tmp_pop = sample_extractor(pop_array, self.urban_sample_idx, axis=0)
+        tmp_pop = sample_extractor(pop_array, axis=0)
         for i in range(0, len(urban_sample_idx)):
         # We take the mean pop density
             obs_pop = np.mean(tmp_pop[i])
@@ -471,11 +442,11 @@ class databaseConstructor:
        """
         # satellite image data
         image_array = []
-        for channel in self.extensions:
+        for channel in self.channels:
             tmp_img = np.array(
                     self.df_image[channel]).reshape((self.nrows, self.ncols))
             tmp_img =  self.sample_extractor(
-                    tmp_img[i,:,:], urban_sample_idx, axis=1)
+                    tmp_img[i,:,:], axis=1)
             image_array = np.array(tmp_img)
         image_array = np.swapaxes(image_array, 0, 1)
         self.image_output_data = np.array(image_array)
