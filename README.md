@@ -18,9 +18,9 @@ I also tried this on a mid-2009 MacBookPro and can recommend you don't.
 
 The files of interest are:
  - `cnn.py`: runs the convolutional neural network
- - `database_constructor.py`: merges satellite images with population
+ - `data_cleaning.py`: merges satellite images with population
    databases (shapefiles)
- - `db_test.py`: a testing file for `database_constructor.py`
+ - `db_test.py`: a testing file for `data_cleaning.py`
     
 In addition to the usual, the analysis relies on these packages 
 

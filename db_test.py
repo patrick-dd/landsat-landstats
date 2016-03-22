@@ -4,7 +4,7 @@ A testing script for the database construction
 
 """
 import unittest
-from databaseConstructor import *
+from data_cleaning import *
 
 ## initialising with existing files
 census_shapefile = 'tabblock2010_53_pophu.shp'
