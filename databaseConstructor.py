@@ -506,7 +506,7 @@ class databaseConstructor:
             if file_size!=(self.image_output_data.shape[0]-1):
                 self.image_output_data = \
                         self.image_output_data[self.file_size:, :, :, :]
-        count += 1
+            count += 1
 
     def save_files_y(self):
         """
@@ -527,7 +527,7 @@ class databaseConstructor:
             f.close()
             if file_size!=(y.shape[0]-1):
                 y = y[file_size:]
-        count += 1
+            count += 1
 
 #def databaseConstruction(census_folder_loc, census_shapefile, urban_folder_loc,
 #    sat_folder_loc, save_folder_loc, state_name, state_code, year, channels,
