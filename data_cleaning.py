@@ -8,7 +8,7 @@ Saves the data as a hdf5 file
 import numpy as np
 import pandas as pd
 import cPickle
-#import h5py
+import h5py
 from osgeo import gdal, ogr
 import pyproj
 from shapely.geometry import Point, Polygon, shape
@@ -32,10 +32,10 @@ class databaseConstructor:
 
     """
     def __init__(
-            self, census_folder_loc, census_shapefile, urban_folder_loc,
-            urban_shapefile, sat_folder_loc, save_folder_loc, state_name, 
+            self, census_folder_loc, census_shapefile,
+            sat_folder_loc, save_folder_loc, state_name, 
             state_code, year, channels, file_size, sample_rate, obs_size, 
-            slice_depth, processes):
+            processes):
         """
         Initialises the class
         Inputs:
@@ -72,7 +72,6 @@ class databaseConstructor:
         self.file_size = file_size
         self.sample_rate = sample_rate
         self.obs_size = obs_size
-        self.slice_depth = slice_depth
         self.processes = processes
         if not os.path.exists( self.census_folder_loc + '/' 
                                 + self.census_shapefile ):
@@ -185,7 +184,67 @@ class databaseConstructor:
                         zip(cols_grid, rows_grid), 
                         self.processes)
 
-    def satelliteImageToDatabase(self):
+
+    def image_slicer(self, image):
+        """
+        
+        Cuts the larger satellite image into smaller images 
+        A less intense version of extract_patches_2d
+        
+        Input:
+            (2d array) satellite image or population map
+
+        """
+        self.patches = []
+        step = int(self.obs_size * self.overlap)
+        self.indices = []
+        if image.shape[0] == 1:
+            for y in range(0, self.nrows, step):
+                for x in range(0, self.ncols, step):
+                    mx = min(x+self.obs_size, self.ncols)
+                    my = min(y+self.obs_size, self.nrows)
+                    tile = image[ y: my, x: mx ]
+                    if tile.shape == (self.obs_size, self.obs_size):
+                        self.patches.append(tile)
+                        self.indices.append((x, y))
+        else:
+            for y in range(0, self.nrows, step):
+                for x in range(0, self.ncols, step):
+                    mx = min(x+obs_size, self.ncols)
+                    my = min(y+obs_size, self.nrows)
+                    tile = image[ :, y : my, x: mx ]
+                    if tile.shape == (self.obs_size, self.obs_size):
+                        self.patches.append(tile)
+                        self.indices.append((x, y))
+        self.patches = np.array(self.patches)
+        self.indices = np.array(self.indices)
+
+    def adder(self, x):
+        """
+       
+        Wrapper for parallelisation
+
+        Takes the north west corner of an image and returns the centroid
+        
+        """
+        return x + (self.obs_size / 2)
+
+    def sample_extractor(self, data_array, axis):
+        """
+
+        Extracts a sample of images
+            (array) data_array, satellite images
+            (axis) axis of array
+            (array) image_sample, Keras ready numpy array of images
+        
+        """
+        patches, indices = self.image_slicer(data_array)
+        print 'patches.shape: ', patches.shape
+        self.image_sample = np.take(
+                patches, self.sample_idx, axis=axis,
+                mode = 'raise')
+ 
+    def import_sat_image(self):
         """
         Converts satellite images to a GeoDataFrame
         The satellite image used here is the 2010 LANDSAT 7 TOA composite
@@ -215,7 +274,7 @@ class databaseConstructor:
         for count, extension in enumerate(self.channels):
             self.df_image[extension] = data[count]
  
-    def census_database(self):
+    def import_census_data(self):
         """
         Gets population density from census data
         Inputs:
@@ -242,7 +301,7 @@ class databaseConstructor:
         self.df_census['density'] = \
                 self.df_census['POP10'] / self.df_census['area'] 
 
-    def sat_census_database(self):
+    def join_sat_census(self):
         """
         
         Combines satellite and urban database construction
@@ -257,66 +316,6 @@ class databaseConstructor:
         self.df_image['pop_density'] = pixel_point_pop['pop']
         self.df_image['latitude_u'] = pixel_point_pop['latitude']
         self.df_image['longitude_u'] = pixel_point_pop['longitude']
-    
-    def image_slicer(self, image):
-        """
-        
-        Cuts the larger satellite image into smaller images 
-        A less intense version of extract_patches_2d
-        
-        Input:
-            (2d array) satellite image or population map
-
-        """
-        self.patches = []
-        step = int(self.obs_size * self.overlap)
-        self.indices = []
-        if self.slice_depth == 1:
-            for y in range(0, self.nrows, step):
-                for x in range(0, self.ncols, step):
-                    mx = min(x+self.obs_size, self.ncols)
-                    my = min(y+self.obs_size, self.nrows)
-                    tile = image[ y: my, x: mx ]
-                    if tile.shape == (self.obs_size, self.obs_size):
-                        self.patches.append(tile)
-                        self.indices.append((x, y))
-        else:
-            for y in range(0, self.nrows, step):
-                for x in range(0, self.ncols, step):
-                    mx = min(x+obs_size, self.ncols)
-                    my = min(y+obs_size, self.nrows)
-                    tile = image[ :, y : my, x: mx ]
-                    if tile.shape == (self.slice_depth, 
-                            self.obs_size, self.obs_size):
-                        self.patches.append(tile)
-                        self.indices.append((x, y))
-        self.patches = np.array(self.patches)
-        self.indices = np.array(self.indices)
-
-    def adder(self, x):
-        """
-       
-        Wrapper for parallelisation
-
-        Takes the north west corner of an image and returns the centroid
-        
-        """
-        return x + (self.obs_size / 2)
-
-    def sample_extractor(self, data_array, axis=None):
-        """
-
-        Extracts a sample of images
-            (array) data_array, satellite images
-            (axis) axis of array
-            (array) image_sample, Keras ready numpy array of images
-        
-        """
-        patches, indices = self.image_slicer(data_array)
-        print 'patches.shape: ', patches.shape
-        self.image_sample = np.take(
-                patches, self.sample_idx, axis=0,
-                mode = 'raise')
     
     def sampling(self):
         """
@@ -441,46 +440,3 @@ class databaseConstructor:
                 y = y[file_size:]
             count += 1
 
-#def databaseConstruction(census_folder_loc, census_shapefile, urban_folder_loc,
-#    sat_folder_loc, save_folder_loc, state_name, state_code, year, channels,
-#    file_size, sample_rate, obs_size):
-#    """
-#    Constructs the data
-#    Inputs:
-#    census_folder_loc: location of data (string)
-#    census_shapefile: name of shapefile (string)
-#    urban_folder_loc: location of urban data (string)
-#    sat_folder_loc: location of satellite images (string)
-#    save_folder_loc: location of folder to save data (string)
-#    state_name: The state name (string)
-#    state_code: Two letter state code (string) 
-#    year: year of investigation string  
-#    channels: bandwidths used in estimation list of strings
-#    file_size: number of image samples per file (int)
-#    sample_rate: proportion of images sampled (float)
-#    obs_size: the length/width of each observation (int)
-#    Returns:
-#    Data for you to play with  :)
-#    """
-#    print 'Collecting satellite data'
-#    df_image, nrows, ncols, satellite_gdal = \
-#        satelliteImageToDatabase(sat_folder_loc, state_name, year, channels)
-#    cPickle.dump(df_image, file('to_interpolate_data.save', 'wb'), protocol=cPickle.HIGHEST_PROTOCOL)
-#    print 'Organising urban data'
-#    df_urban = urbanDatabase(urban_folder_loc, state_code)
-#    print 'Combining dataframes'
-#    df_image = satUrbanDatabase(df_urban, df_image)
-#    print 'Sampling'
-#    urban_sample_idx, knn_data = sampling(sample_rate, obs_size, nrows, ncols, 
-#                        df_image, satellite_gdal)
-#    cPickle.dump(knn_data, file('knn_X_data.save', 'wb'), protocol=cPickle.HIGHEST_PROTOCOL)
-#    print 'Collecting census data'
-#    df_census = censusDatabase(census_folder_loc, census_shapefile)
-#    print 'Merging dataframes'
-#    df_image = mergeCensusSatellite(df_census, df_image)
-#    print 'Creating samples for Keras'
-#    X, y = sampleGenerator(obs_size, df_image, channels, nrows, ncols, urban_sample_idx)
-#    print 'Saving files'
-#    saveFiles_y(y, file_size, save_folder_loc, state_name)
-#    saveFiles_X(X, file_size, save_folder_loc, state_name)
-#    print 'Job done!'
