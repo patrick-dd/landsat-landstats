@@ -21,7 +21,60 @@ from multiprocessing import Pool
 import parmap
 import os, sys
 
-class databaseConstructor:
+
+def point_wrapper(x, y):
+    """
+    A wrapper to use the point function in parallel 
+    """
+    return Point(x, y)
+
+ 
+def pixel_to_coordinates(column, row, geotransform):
+    """
+
+    Returns lat lon coordinates from pixel position 
+    using an affine transformation
+
+    See http://www.gdal.org/gdal_datamodel.html
+
+    Outside of the class because it's used in parallel
+
+    Input:
+        (array) geotransfrom
+        (int) column, row
+    Returns:
+        (float) lat, lon projection coordinates
+
+    """
+    x_origin = geotransform[0]
+    y_origin = geotransform[3]
+    pixel_width = geotransform[1]
+    pixel_height = geotransform[5]
+    rotation_x = geotransform[2]
+    rotation_y = geotransform[4]
+    # The affine transformation
+    lon_coord = x_origin + (column * pixel_width) + (row * rotation_x)
+    lat_coord = y_origin + (column * rotation_y) + (row * pixel_height)
+    return (lon_coord, lat_coord)
+
+def array_wrapper(self, col, row, array):
+    """
+    A wrapper to use the point function in parallel 
+    """
+    return array[row][col]
+
+def adder(self, x):
+    """
+   
+    Wrapper for parallelisation
+
+    Takes the north west corner of an image and returns the centroid
+    
+    """
+    return x + (self.obs_size / 2)
+
+
+class database_constructor:
     """
 
     A class to take a 
@@ -61,8 +114,6 @@ class databaseConstructor:
         """
         self.census_folder_loc = census_folder_loc
         self.census_shapefile = census_shapefile
-        self.urban_folder_loc = urban_folder_loc
-        self.urban_shapefile = urban_shapefile
         self.sat_folder_loc = sat_folder_loc
         self.save_folder_loc = save_folder_loc
         self.state_name = state_name
@@ -85,32 +136,7 @@ class databaseConstructor:
                         ' does not exist')
         self.satellite_gdal = gdal.Open(self.filename)
 
-    def pixel_to_coordinates(self, column, row):
-        """
-
-        Returns lat lon coordinates from pixel position 
-        using an affine transformation
-
-        See http://www.gdal.org/gdal_datamodel.html
-
-        Input:
-            (array) geotransfrom
-            (int) column, row
-        Returns:
-            (float) lat, lon projection coordinates
-
-        """
-        x_origin = self.geotransform[0]
-        y_origin = self.geotransform[3]
-        pixel_width = self.geotransform[1]
-        pixel_height = self.geotransform[5]
-        rotation_x = self.geotransform[2]
-        rotation_y = self.geotransform[4]
-        # The affine transformation
-        lon_coord = x_origin + (column * pixel_width) + (row * rotation_x)
-        lat_coord = y_origin + (column * rotation_y) + (row * pixel_height)
-        return (lon_coord, lat_coord)
-    
+        
     def spatialIndex(self, blocks):
         """
         Input:
@@ -146,18 +172,6 @@ class databaseConstructor:
             pixelPoint_db.append([temp_polygon, temp_pop, pixel.x, pixel.y])
         return GeoDataFrame(pixelPoint_db)
 
-    def point_wrapper(self, x, y):
-        """
-        A wrapper to use the point function in parallel 
-        """
-        return Point(x, y)
-
-    def array_wrapper(self, col, row, array):
-        """
-        A wrapper to use the point function in parallel 
-        """
-        return array[row][col]
-
     def get_location(self):
         """
 
@@ -172,17 +186,18 @@ class databaseConstructor:
                     range(0 * self.nrows, 1 * self.nrows))
         cols_grid, rows_grid = rows_grid.flatten(), cols_grid.flatten()
         # getting a series of lat lon points for each pixel
-        self.geotransform = satellite_gdal.GetGeoTransform()
+        self.geotransform = self.satellite_gdal.GetGeoTransform()
         print 'Getting locations'
         self.location_series = parmap.starmap(
-                        self.pixel_to_coordinates, 
+                        pixel_to_coordinates, 
                         zip(cols_grid, rows_grid), 
-                        self.geotransform, self.processes)
+                        self.geotransform,
+                        processes = self.processes)
         print 'Converting to Points'
         self.location_series = parmap.starmap(
-                        self.point_wrapper, 
+                        point_wrapper, 
                         zip(cols_grid, rows_grid), 
-                        self.processes)
+                        processes = self.processes)
 
 
     def image_slicer(self, image):
@@ -218,16 +233,6 @@ class databaseConstructor:
                         self.indices.append((x, y))
         self.patches = np.array(self.patches)
         self.indices = np.array(self.indices)
-
-    def adder(self, x):
-        """
-       
-        Wrapper for parallelisation
-
-        Takes the north west corner of an image and returns the centroid
-        
-        """
-        return x + (self.obs_size / 2)
 
     def sample_extractor(self, data_array, axis):
         """
@@ -336,11 +341,12 @@ class databaseConstructor:
         pop_patches, pop_indices = self.image_slicer(self.pop_array)
         print 'get locations for individual frames'
         pool = Pool(self.processes)
-        cols_grid = pool.map(self.adder, pop_indices[:,0])
-        rows_grid = pool.map(self.adder, pop_indices[:,1])
+        cols_grid = pool.map(adder, pop_indices[:,0])
+        rows_grid = pool.map(adder, pop_indices[:,1])
         self.frame_location_series = parmap.starmap(
-                pixelToCoordinates,
-                zip(cols_grid, rows_grid), self.geotransform, processes=8)
+                pixel_to_coordinates,
+                zip(cols_grid, rows_grid), self.geotransform, 
+                processes=self.processes)
         print 'converting locations to Points'
         self.frame_location_series = \
                 pool.map(Point, self.frame_location_series)
@@ -391,7 +397,7 @@ class databaseConstructor:
             pop_output_data.append(obs_pop)
         self.pop_output_data = np.nan_to_num(np.array(pop_output_data))
 
-    def saveFiles_X(X, file_size, save_folder_loc, state_name):
+    def save_files_X(self):
         """
         Saves the image information
         Inputs:
