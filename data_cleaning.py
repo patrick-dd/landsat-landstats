@@ -57,7 +57,7 @@ def pixel_to_coordinates(column, row, geotransform):
     lat_coord = y_origin + (column * rotation_y) + (row * pixel_height)
     return (lon_coord, lat_coord)
 
-def array_wrapper(self, col, row, array):
+def array_wrapper(col, row, array):
     """
     A wrapper to use the point function in parallel 
     """
@@ -178,25 +178,26 @@ class database_constructor:
         Extracts the location of each pixel in the satellite image
 
         """
-        self.ncols = self.satellite_gdal.RasterXSize 
-        self.nrows = self.satellite_gdal.RasterYSize
+        self.ncols = self.satellite_gdal.RasterXSize / 20
+        self.nrows = self.satellite_gdal.RasterYSize / 20
         print 'Columns, rows', self.ncols, self.nrows
         rows_grid, cols_grid = np.meshgrid(
-                    range(0 * self.ncols, 1 * self.ncols), 
-                    range(0 * self.nrows, 1 * self.nrows))
-        cols_grid, rows_grid = rows_grid.flatten(), cols_grid.flatten()
+                    range(2 * self.ncols, 3 * self.ncols), 
+                    range(2 * self.nrows, 3 * self.nrows))
+        self.cols_grid = cols_grid.flatten()
+        self.rows_grid = rows_grid.flatten()
         # getting a series of lat lon points for each pixel
         self.geotransform = self.satellite_gdal.GetGeoTransform()
         print 'Getting locations'
         self.location_series = parmap.starmap(
                         pixel_to_coordinates, 
-                        zip(cols_grid, rows_grid), 
+                        zip(self.cols_grid, self.rows_grid), 
                         self.geotransform,
                         processes = self.processes)
         print 'Converting to Points'
         self.location_series = parmap.starmap(
                         point_wrapper, 
-                        zip(cols_grid, rows_grid), 
+                        zip(self.cols_grid, self.rows_grid), 
                         processes = self.processes)
 
 
@@ -269,13 +270,14 @@ class database_constructor:
                         ' does not exist')
             # getting data
             print 'Loading bandwidth', extension
-            band = satellite_gdal.GetRasterBand(1)
+            band = self.satellite_gdal.GetRasterBand(1)
             array = band.ReadAsArray()
             band_series = parmap.starmap(
-                    array_wrapper, zip(cols_grid, rows_grid), 
-                    array, self.processes)
+                    array_wrapper, 
+                    zip(self.cols_grid, self.rows_grid), 
+                    array, processes = self.processes)
             data.append(band_series)
-        self.df_image = GeoDataFrame({'location': location_series})
+        self.df_image = GeoDataFrame({'location': self.location_series})
         for count, extension in enumerate(self.channels):
             self.df_image[extension] = data[count]
  
@@ -289,6 +291,7 @@ class database_constructor:
             df_census: GeoDataFrame with census information
         """ 
         ## Importing shapefile 
+        print 'Importing census data'
         self.df_census = GeoDataFrame.from_file(
                 self.census_folder_loc + self.census_shapefile) 
         # It turns out the earth isn't flat 
@@ -312,8 +315,8 @@ class database_constructor:
         Combines satellite and urban database construction
         
         """
+        print 'Joining satellite and census data'
         self.census_blocks = np.array(self.df_census['geometry'])
-        print 'Amount of urban blocks: ', len(self.urban_census)
         self.idx = self.spatialIndex(self.census_blocks)
         pixel_point_urban = self.point_within_polygon_pop(
                 self.idx, self.location_series, self.census_blocks) 
