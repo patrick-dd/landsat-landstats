@@ -149,7 +149,7 @@ class database_constructor:
             idx.insert(count, block.bounds)
         return idx
 
-    def point_within_polygon_pop(self, idx, points, polygons, pop):
+    def point_within_polygon(self, idx, points, polygons, pop):
         """
         Finds the census tract containing pixels
         Inputs:
@@ -294,20 +294,31 @@ class database_constructor:
         print 'Importing census data'
         self.df_census = GeoDataFrame.from_file(
                 self.census_folder_loc + self.census_shapefile) 
+        print 'Census data loaded'
         # It turns out the earth isn't flat 
         # Getting area in km**2 
+        print 'Calculating area'
         area_sq_degrees = self.df_census['geometry'] 
+        print len(area_sq_degrees)
         area_sq_km = [] 
         for region in area_sq_degrees: 
-            geom_area = ops.transform( partial( 
-                pyproj.transform, pyproj.Proj(init='EPSG:4326'), 
-                pyproj.Proj( proj='aea', 
-                    lat1=region.bounds[1], lat2=region.bounds[3])), region) 
-        area = geom_area.area / 1000000.0  #convert to km2
-        area_sq_km.append( area )
+            geom_area = ops.transform(
+                    partial(
+                        pyproj.transform, 
+                        pyproj.Proj(init='EPSG:4326'), 
+                        pyproj.Proj(
+                            proj='aea', 
+                            lat1=region.bounds[1], 
+                            lat2=region.bounds[3]
+                            )
+                        ), 
+                    region) 
+            area = geom_area.area / 1000000.0  #convert to km2
+            area_sq_km.append( area )
         self.df_census['area'] = area_sq_km
         self.df_census['density'] = \
-                self.df_census['POP10'] / self.df_census['area'] 
+                self.df_census['POP10'] / self.df_census['area']
+        print 'Area calculated'
 
     def join_sat_census(self):
         """
@@ -317,9 +328,11 @@ class database_constructor:
         """
         print 'Joining satellite and census data'
         self.census_blocks = np.array(self.df_census['geometry'])
+        self.census_pop = np.array(self.df_census['density'])
         self.idx = self.spatialIndex(self.census_blocks)
-        pixel_point_urban = self.point_within_polygon_pop(
-                self.idx, self.location_series, self.census_blocks) 
+        pixel_point = self.point_within_polygon(
+                self.idx, self.location_series, self.census_blocks,
+                self.df_census_pop)
         pixel_point_urban.columns = ['poly', 'pop', 'latitude', 'longitude']
         self.df_image['pop_density'] = pixel_point_pop['pop']
         self.df_image['latitude_u'] = pixel_point_pop['latitude']
