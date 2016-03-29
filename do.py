@@ -22,8 +22,8 @@ save_folder_loc = 'data/keras/'
 file_size = 1024				# number of observations in each file
 sample_rate = 0.2				# number of total images sampled
 obs_size = 32					# size of image
-processes = 16                  # number of CPU cores
-step = 1                        # size of step in image creation
+processes = 40                  # number of CPU cores
+step = 4                        # size of step in image creation
 
 if __name__ == "__main__":
     print 'Starting database construction'
