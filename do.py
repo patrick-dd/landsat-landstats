@@ -22,15 +22,15 @@ save_folder_loc = 'data/keras/'
 file_size = 1024				# number of observations in each file
 sample_rate = 0.2				# number of total images sampled
 obs_size = 32					# size of image
-processes = 16                   # number of CPU cores
-
+processes = 16                  # number of CPU cores
+step = 1                        # size of step in image creation
 
 if __name__ == "__main__":
     print 'Starting database construction'
     db = database_constructor(census_folder_loc, census_shapefile,
             sat_folder_loc, save_folder_loc, state_name, 
             state_code, year, channels, file_size, sample_rate, obs_size,
-            processes)
+            processes, step)
     db.import_sat_image()
     db.import_census_data()
     db.join_sat_census()

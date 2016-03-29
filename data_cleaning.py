@@ -22,11 +22,11 @@ import parmap
 import os, sys
 
 
-def point_wrapper(x, y):
+def point_wrapper(x):
     """
     A wrapper to use the point function in parallel 
     """
-    return Point(x, y)
+    return Point(x[0], x[1])
 
  
 def pixel_to_coordinates(column, row, geotransform):
@@ -63,7 +63,7 @@ def array_wrapper(col, row, array):
     """
     return array[row][col]
 
-def adder(self, x):
+def adder(x):
     """
    
     Wrapper for parallelisation
@@ -71,7 +71,7 @@ def adder(self, x):
     Takes the north west corner of an image and returns the centroid
     
     """
-    return x + (self.obs_size / 2)
+    return x + 16 
 
 
 class database_constructor:
@@ -88,7 +88,7 @@ class database_constructor:
             self, census_folder_loc, census_shapefile,
             sat_folder_loc, save_folder_loc, state_name, 
             state_code, year, channels, file_size, sample_rate, obs_size, 
-            processes):
+            processes, step):
         """
         Initialises the class
         Inputs:
@@ -124,6 +124,7 @@ class database_constructor:
         self.sample_rate = sample_rate
         self.obs_size = obs_size
         self.processes = processes
+        self.step = step
         if not os.path.exists( self.census_folder_loc + '/' 
                                 + self.census_shapefile ):
             sys.exit('Error: File ' + self.census_folder_loc + '/' 
@@ -178,27 +179,27 @@ class database_constructor:
         Extracts the location of each pixel in the satellite image
 
         """
-        self.ncols = self.satellite_gdal.RasterXSize / 20
-        self.nrows = self.satellite_gdal.RasterYSize / 20
+        self.ncols = self.satellite_gdal.RasterXSize 
+        self.nrows = self.satellite_gdal.RasterYSize
         print 'Columns, rows', self.ncols, self.nrows
         rows_grid, cols_grid = np.meshgrid(
-                    range(2 * self.ncols, 3 * self.ncols), 
-                    range(2 * self.nrows, 3 * self.nrows))
+                    range(0, self.ncols), 
+                    range(0, self.nrows))
         self.cols_grid = cols_grid.flatten()
         self.rows_grid = rows_grid.flatten()
         # getting a series of lat lon points for each pixel
         self.geotransform = self.satellite_gdal.GetGeoTransform()
         print 'Getting locations'
-        self.location_series = parmap.starmap(
+        self.location_series = np.array(parmap.starmap(
                         pixel_to_coordinates, 
                         zip(self.cols_grid, self.rows_grid), 
                         self.geotransform,
-                        processes = self.processes)
+                        processes = self.processes))
         print 'Converting to Points'
-        self.location_series = parmap.starmap(
+        pool = Pool(self.processes)
+        self.location_series = pool.map(
                         point_wrapper, 
-                        zip(self.cols_grid, self.rows_grid), 
-                        processes = self.processes)
+                        self.location_series)
 
 
     def image_slicer(self, image):
@@ -212,11 +213,10 @@ class database_constructor:
 
         """
         self.patches = []
-        step = int(self.obs_size * self.overlap)
         self.indices = []
-        if image.shape[0] == 1:
-            for y in range(0, self.nrows, step):
-                for x in range(0, self.ncols, step):
+        if len(image.shape) == 2:
+            for y in range(0, self.nrows - self.obs_size, self.step):
+                for x in range(0, self.ncols - self.obs_size, self.step):
                     mx = min(x+self.obs_size, self.ncols)
                     my = min(y+self.obs_size, self.nrows)
                     tile = image[ y: my, x: mx ]
@@ -224,10 +224,10 @@ class database_constructor:
                         self.patches.append(tile)
                         self.indices.append((x, y))
         else:
-            for y in range(0, self.nrows, step):
-                for x in range(0, self.ncols, step):
-                    mx = min(x+obs_size, self.ncols)
-                    my = min(y+obs_size, self.nrows)
+            for y in range(0, self.nrows, self.step):
+                for x in range(0, self.ncols, self.step):
+                    mx = min(x+self.obs_size, self.ncols)
+                    my = min(y+self.obs_size, self.nrows)
                     tile = image[ :, y : my, x: mx ]
                     if tile.shape == (self.obs_size, self.obs_size):
                         self.patches.append(tile)
@@ -272,11 +272,11 @@ class database_constructor:
             print 'Loading bandwidth', extension
             band = self.satellite_gdal.GetRasterBand(1)
             array = band.ReadAsArray()
-            band_series = parmap.starmap(
-                    array_wrapper, 
-                    zip(self.cols_grid, self.rows_grid), 
-                    array, processes = self.processes)
-            data.append(band_series)
+            #band_series = parmap.starmap(
+            #        array_wrapper, 
+            #        zip(self.cols_grid, self.rows_grid), 
+            #        array, processes = self.processes)
+            data.append(array.flatten())
         self.df_image = GeoDataFrame({'location': self.location_series})
         for count, extension in enumerate(self.channels):
             self.df_image[extension] = data[count]
@@ -299,7 +299,6 @@ class database_constructor:
         # Getting area in km**2 
         print 'Calculating area'
         area_sq_degrees = self.df_census['geometry'] 
-        print len(area_sq_degrees)
         area_sq_km = [] 
         for region in area_sq_degrees: 
             geom_area = ops.transform(
@@ -332,11 +331,11 @@ class database_constructor:
         self.idx = self.spatialIndex(self.census_blocks)
         pixel_point = self.point_within_polygon(
                 self.idx, self.location_series, self.census_blocks,
-                self.df_census_pop)
-        pixel_point_urban.columns = ['poly', 'pop', 'latitude', 'longitude']
-        self.df_image['pop_density'] = pixel_point_pop['pop']
-        self.df_image['latitude_u'] = pixel_point_pop['latitude']
-        self.df_image['longitude_u'] = pixel_point_pop['longitude']
+                self.census_pop)
+        pixel_point.columns = ['poly', 'pop', 'latitude', 'longitude']
+        self.df_image['pop_density'] = pixel_point['pop']
+        self.df_image['latitude_u'] = pixel_point['latitude']
+        self.df_image['longitude_u'] = pixel_point['longitude']
     
     def sampling(self):
         """
@@ -354,11 +353,11 @@ class database_constructor:
         self.pop_array = np.array(
                 self.pop_array).reshape((self.nrows, self.ncols))
         print 'extract patches'
-        pop_patches, pop_indices = self.image_slicer(self.pop_array)
+        self.image_slicer(self.pop_array)
         print 'get locations for individual frames'
         pool = Pool(self.processes)
-        cols_grid = pool.map(adder, pop_indices[:,0])
-        rows_grid = pool.map(adder, pop_indices[:,1])
+        cols_grid = pool.map(adder, self.indices[:,0])
+        rows_grid = pool.map(adder, self.indices[:,1])
         self.frame_location_series = parmap.starmap(
                 pixel_to_coordinates,
                 zip(cols_grid, rows_grid), self.geotransform, 
@@ -366,9 +365,8 @@ class database_constructor:
         print 'converting locations to Points'
         self.frame_location_series = \
                 pool.map(Point, self.frame_location_series)
-        print 'counting urban'
-        pop_count = np.array([np.mean(patch) for patch in pop_patches])
-        self.df_sample = pd.DataFrame(pop_count, columns='pop_ave')
+        pop_count = np.array([np.mean(patch) for patch in self.patches])
+        self.df_sample = pd.DataFrame(pop_count, columns=['pop_ave'])
         # Getting the locations
         self.df_sample['location'] = self.frame_location_series
         # Creating sample weights 
