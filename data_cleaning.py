@@ -179,8 +179,8 @@ class database_constructor:
         Extracts the location of each pixel in the satellite image
 
         """
-        self.ncols = self.satellite_gdal.RasterXSize 
-        self.nrows = self.satellite_gdal.RasterYSize
+        self.ncols = self.satellite_gdal.RasterXSize
+        self.nrows = self.satellite_gdal.RasterYSize 
         print 'Columns, rows', self.ncols, self.nrows
         rows_grid, cols_grid = np.meshgrid(
                     range(0, self.ncols), 
@@ -244,10 +244,9 @@ class database_constructor:
             (array) image_sample, Keras ready numpy array of images
         
         """
-        patches, indices = self.image_slicer(data_array)
-        print 'patches.shape: ', patches.shape
+        self.image_slicer(data_array)
         self.image_sample = np.take(
-                patches, self.sample_idx, axis=axis,
+                self.patches, self.sample_idx, axis=axis,
                 mode = 'raise')
  
     def import_sat_image(self):
@@ -271,14 +270,15 @@ class database_constructor:
             # getting data
             print 'Loading bandwidth', extension
             band = self.satellite_gdal.GetRasterBand(1)
-            array = band.ReadAsArray()
+            band_array = band.ReadAsArray()
             #band_series = parmap.starmap(
             #        array_wrapper, 
             #        zip(self.cols_grid, self.rows_grid), 
-            #        array, processes = self.processes)
-            data.append(array.flatten())
+            #        band_array, processes = self.processes)
+            data.append(band_array.flatten())
         self.df_image = GeoDataFrame({'location': self.location_series})
         for count, extension in enumerate(self.channels):
+            print count, extension
             self.df_image[extension] = data[count]
  
     def import_census_data(self):
@@ -316,7 +316,8 @@ class database_constructor:
             area_sq_km.append( area )
         self.df_census['area'] = area_sq_km
         self.df_census['density'] = \
-                self.df_census['POP10'] / self.df_census['area']
+                self.df_census['DP0010001'] / self.df_census['area']
+                #self.df_census['POP10'] / self.df_census['area']
         print 'Area calculated'
 
     def join_sat_census(self):
@@ -389,9 +390,10 @@ class database_constructor:
         for channel in self.channels:
             tmp_img = np.array(
                     self.df_image[channel]).reshape((self.nrows, self.ncols))
-            tmp_img =  self.sample_extractor(
-                    tmp_img[i,:,:], axis=1)
-            image_array = np.array(tmp_img)
+            self.sample_extractor(tmp_img[:,:], axis=0)
+            image_array.append(np.array(self.image_sample))
+        image_array = np.array(image_array)    
+        print image_array.shape
         image_array = np.swapaxes(image_array, 0, 1)
         self.image_output_data = np.array(image_array)
     
@@ -404,10 +406,10 @@ class database_constructor:
         """
         # getting population data
         pop_output_data = []
-        tmp_pop = self.sample_extractor(self.pop_array, axis=0)
+        self.sample_extractor(self.pop_array, axis=0)
         for i in range(0, len(self.sample_idx)):
             # We take the mean pop density
-            obs_pop = np.mean(tmp_pop[i])
+            obs_pop = np.mean(self.image_sample[i])
             pop_output_data.append(obs_pop)
         self.pop_output_data = np.nan_to_num(np.array(pop_output_data))
 
@@ -434,7 +436,7 @@ class database_constructor:
                             '_X_%d.hdf5' % count, 'w')
             f.create_dataset('data', data = temp, compression="gzip")
             f.close()
-            if file_size!=(self.image_output_data.shape[0]-1):
+            if self.file_size!=(self.image_output_data.shape[0]-1):
                 self.image_output_data = \
                         self.image_output_data[self.file_size:, :, :, :]
             count += 1
@@ -450,13 +452,13 @@ class database_constructor:
         print 'Number of files', no_files
         for i in range(0, no_files):
             # file size changes for X and y
-            temp = y[0:file_size]
+            temp = self.pop_output_data[0:self.file_size]
             f = h5py.File(
                     self.save_folder_loc + 'db_' + self.state_name + \
                             '_y_%d.hdf5'% count, 'w')
             f.create_dataset('data', data = temp, compression="gzip")
             f.close()
-            if file_size!=(y.shape[0]-1):
-                y = y[file_size:]
+            if self.file_size!=(self.pop_output_data.shape[0]-1):
+                self.pop_output_data = self.pop_output_data[self.file_size:]
             count += 1
 

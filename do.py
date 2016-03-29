@@ -8,14 +8,14 @@ from data_cleaning import *
 ## Note the file naming
 ## Number _53_ for Washington
 ## Number _41_ for Oregon
-census_shapefile = 'tabblock2010_53_pophu.shp'
+census_shapefile = 'County_2010Census_DP1.shp'
 state_name = 'Washington'
 state_code = 'WA'
 year = '2010'
 
-channels = ['B1', 'B2'] #, 'B3', 'B4'] #, 'B5', 'B6_VCID_2', 'B7']
-sat_folder_loc = 'data/landsat/' + state_name + '/'
-census_folder_loc = 'data/census/'
+channels = ['B1', 'B2' , 'B3', 'B4'] #, 'B5', 'B6_VCID_2', 'B7']
+sat_folder_loc = 'data/landsat/one_km/'    # + state_name + '/'
+census_folder_loc = 'data/county_2010_census/'
 save_folder_loc = 'data/keras/'
 
 # a file size of 10 ~ 1mb
@@ -23,7 +23,7 @@ file_size = 1024				# number of observations in each file
 sample_rate = 0.2				# number of total images sampled
 obs_size = 32					# size of image
 processes = 40                  # number of CPU cores
-step = 4                        # size of step in image creation
+step = 16                        # size of step in image creation
 
 if __name__ == "__main__":
     print 'Starting database construction'
