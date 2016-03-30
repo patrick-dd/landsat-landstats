@@ -278,7 +278,6 @@ class database_constructor:
             data.append(band_array.flatten())
         self.df_image = GeoDataFrame({'location': self.location_series})
         for count, extension in enumerate(self.channels):
-            print count, extension
             self.df_image[extension] = data[count]
  
     def import_census_data(self):
@@ -316,7 +315,7 @@ class database_constructor:
             area_sq_km.append( area )
         self.df_census['area'] = area_sq_km
         self.df_census['density'] = \
-                self.df_census['DP0010001'] / self.df_census['area']
+                self.df_census['POP10'] / self.df_census['area']
                 #self.df_census['POP10'] / self.df_census['area']
         print 'Area calculated'
 
