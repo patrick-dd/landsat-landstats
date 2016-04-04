@@ -63,129 +63,102 @@ print mean_value, std_value
 
 # normalize target values
 
-# <weighted_log>
-y_train = np.log10(y_train + 1)
-#y_test = np.log10(y_test + 1)
-# </weighted_log>
+# <log normalised>
+y_train = np.log(y_train + 1)
+y_mean = np.mean(y_train)
+y_std = np.std(y_train)
+y_train -= y_mean
+y_train /= y_std
+# </log normalised>
 
-# training weights
-inv_weight, bin_val = np.histogram(y_train)
-clamp_idx = len(inv_weight) - 1
-weight_idx = [min(np.searchsorted(bin_val, v, side="left"), clamp_idx) for v in y_train]
-sample_weights = 1.0 / inv_weight[weight_idx]
-
-# <weighted>
-max_train = y_train.max()
-y_train /= max_train
-#y_test /= max_train
-# </weighted>
-
-print 'Max_train', max_train
-
-def un_normalise(y_in, max_train):
-	"""
-	Unnormalises the output
-	Inputs:
-		y_in: numpy array of normalised estimates
-		max_train: maximum value of y post logarithm
-	Returns:
-		y_out: numpy array of un normalised values
-	"""
-	y_in *= max_train
-	y_out = [ (10**y - 1) for y in y_in ]
-	return np.array(y_out)
 
 print 'Creating the model'
-
-# sequential wrapper model
 model = Sequential()
+model.add(Convolution2D(64, 3, 3, 
+			border_mode='same',
+			input_shape = (7, obs_size, obs_size),
+                        init='he_uniform'))
+model.add(Activation('relu'))
+model.add(Convolution2D(64, 3, 3, 
+			border_mode='same',
+                        init='he_uniform'))
+model.add(Activation('relu'))
+model.add(MaxPooling2D(pool_size=(2, 2), strides=(2,2)))
+#model.add(Dropout(0.25))
 
-# first convolutional pair
-model.add(Convolution2D(256, 5, 5, 
-			border_mode='valid',
-			input_shape = (4, obs_size, obs_size)))
-model.add(LeakyReLU(alpha=0.001))
-model.add(Dropout(0.3))
+model.add(Convolution2D(128, 3, 3,
+                        border_mode='same',
+                        init='he_uniform'))
+model.add(Activation('relu'))
+model.add(Convolution2D(128, 3, 3, 
+			border_mode='same',
+                        init='he_uniform'))
+model.add(Activation('relu'))
+model.add(MaxPooling2D(pool_size=(2, 2), strides=(2,2)))
+#model.add(Dropout(0.25))
 
-# second convolutional pair
-#model.add(Convolution2D(128, 3, 3, border_mode='valid'))
-#model.add(MaxPooling2D(pool_size=(3, 3)))
-#model.add(LeakyReLU(alpha=0.001))
-#model.add(Dropout(0.3))
-
-# third convolutional pair
-#model.add(Convolution2D(128, 3, 3, border_mode='valid'))
-#model.add(MaxPooling2D(pool_size=(2, 2)))
-#model.add(LeakyReLU(alpha=0.001))
-#model.add(Dropout(0.3))
-
-# forth convolutional layer 
-#model.add(Convolution2D(128, 3, 3))
-#model.add(MaxPooling2D(pool_size=(2, 2)))
-#model.add(Activation('relu'))
-#model.add(Dropout(0.3))
-
-# convert convolutional filters to flat so they
-# can be fed to fully connected layers
+model.add(Convolution2D(256, 3, 3,
+                        border_mode='same',
+                        init='he_uniform'))
+model.add(Activation('relu'))
+model.add(Convolution2D(256, 3, 3, 
+			border_mode='same',
+                        init='he_uniform'))
+model.add(Activation('relu'))
+model.add(MaxPooling2D(pool_size=(2, 2), strides=(2,2)))
+#model.add(Dropout(0.25))
 
 model.add(Flatten())
-
-# first fully connected layer
-model.add(Dense(128))
+model.add(Dense(4096, init='he_uniform'))
 model.add(Activation('relu'))
-model.add(Dropout(0.3))
+model.add(Dense(4096, init='he_uniform'))
+model.add(Activation('relu'))
 
-# second fully connected layer
-#model.add(Dense(64))
-#model.add(Activation('relu'))
-#model.add(Dropout(0.3))
-
-# third fully connected layer
-#model.add(Dense(25))
-#model.add(Activation('linear'))
-
-# classification fully connected layer
-model.add(Dense(1))
+#model.add(Dropout(0.5))
+model.add(Dense(1, init='glorot_uniform'))
 model.add(Activation('linear'))
-
-
-# load the weights 
-# note: when there is a complete match between your model definition
-# and your weight savefile, you can simply call model.load_weights(filename)
-#model.load_weights('model_weights.h5')
-#print('Model loaded.')
 
 # setting sgd optimizer parameters
 adam = Adam(lr = 0.01, beta_1 = 0.9, beta_2 = 0.999, epsilon = 1e-8)
-#sgd = SGD(lr = 1, decay = 1e-6, momentum = 0.9, nesterov = True)
+#sgd = SGD(lr = 0.1, decay = 1e-6, momentum = 0.9, nesterov = True)
 model.compile(loss='mean_squared_error', optimizer='adam')
 
-earlystop = callbacks.EarlyStopping(monitor='val_loss', patience = 10, 
+earlystop = callbacks.EarlyStopping(monitor='val_loss', patience = 5, 
 	verbose=1, mode='min')
 checkpoint = callbacks.ModelCheckpoint('/tmp/weights.hdf5', 
 	monitor='val_loss', verbose=1, save_best_only=True, mode='auto')
 history = callbacks.History()
 
 print("Starting training")
-model.fit(X_train, y_train, batch_size=128, validation_split=0.15, sample_weight=sample_weights,
-		show_accuracy=False, callbacks = [earlystop, checkpoint, history])
+model.fit(X_train, y_train, batch_size=32, validation_split=0.15, nb_epoch=25,
+        show_accuracy=False, callbacks = [earlystop, checkpoint, history])
+
+# save as JSON
+json_string = model.to_json()
+# save model weights
+model.save_weights('model_weights.hdf5', overwrite=True)
+
 print("Evaluating")
-score = model.evaluate(X_train, y_train, batch_size=128)
-#predicted = model.predict(X_test)  
-print score
+predicted = np.array(model.predict(X_test)).flatten()
+print 'Predictions on training output'
 
+slope, intercept, r_val, p_val, std_err = stats.linregress(predicted, y_train)
+print 'R squared:', r_val**2
+print 'Intercept:', intercept
+print 'Slope:', slope
+print 'P value:', p_val
 
-#fig, ax = plt.subplots()
-#ax.scatter(y_test, predicted, marker = 'o') 
-#ax.set_xlabel('Log normalised population density', fontsize=20)
-#ax.set_ylim(0, max(predicted) )
-#ax.set_xlim(0, max(y_test))
-#ax.set_ylabel('Model prediction', fontsize=20)
-#x = np.linspace(0, max(y_test))
-#ax.plot(x, x, color='y', linewidth=3)
-#plt.savefig('scatter.png')
-#plt.cla()
-#plt.clf()
+fig, ax = plt.subplots()
+ax.scatter(y_test, predicted, marker = 'o') 
+ax.set_xlabel('Log normalised population density', fontsize=20)
+ax.set_ylim(0, max(predicted) )
+ax.set_xlim(0, max(y_test))
+ax.set_ylabel('Model prediction', fontsize=20)
+x = np.linspace(0, max(y_test))
+ax.plot(x, x, color='y', linewidth=3)
+plt.savefig('scatter.png')
+plt.cla()
+plt.clf()
 
 #pickle.dump( predicted, open( "predicted_normalised.p", "wb" ) )
 #pickle.dump( y_test, open( "y_normalised.p", "wb" ) )
@@ -196,18 +169,15 @@ print score
 #pickle.dump( pred_unnorm, open( "predicted_unnormalised.p", "wb" ) )
 #pickle.dump( y_unnorm, open( "y_unnormalised.p", "wb" ) )
 
-#fix, ax = plt.subplots()
-#ax.plot(history.history['loss'], label = 'Training loss')
-#ax.plot(history.history['val_loss'], label = 'Validation loss')
-#ax.set_xlabel('Epoch', fontsize=20)
-#ax.set_ylabel('RMSE (people per km$^2$)', fontsize=20)
-#plt.legend()
-#plt.savefig('loss.png')
+fix, ax = plt.subplots()
+ax.plot(history.history['loss'], label = 'Training loss')
+ax.plot(history.history['val_loss'], label = 'Validation loss')
+ax.set_xlabel('Epoch', fontsize=20)
+ax.set_ylabel('RMSE (people per km$^2$)', fontsize=20)
+plt.legend()
+plt.savefig('loss.png')
 
 print 'Printing History'
 print history.history
 
-# save as JSON
-json_string = model.to_json()
-# save model weights
-model.save_weights('model_weights.hdf5', overwrite=True)
+
