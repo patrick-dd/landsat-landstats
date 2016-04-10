@@ -302,8 +302,10 @@ class database_constructor:
         for region in area_sq_degrees: 
             geom_area = ops.transform(
                     partial(
-                        pyproj.transform, 
-                        pyproj.Proj(init='EPSG:4326'), 
+                        pyproj.transform,
+                        # projection GSCNAD83
+                        # southern WA EPSG:2286
+                        pyproj.Proj(init='EPSG:2286'), 
                         pyproj.Proj(
                             proj='aea', 
                             lat1=region.bounds[1], 
@@ -316,7 +318,6 @@ class database_constructor:
         self.df_census['area'] = area_sq_km
         self.df_census['density'] = \
                 self.df_census['POP10'] / self.df_census['area']
-                #self.df_census['POP10'] / self.df_census['area']
         print 'Area calculated'
 
     def join_sat_census(self):
@@ -377,6 +378,22 @@ class database_constructor:
                 weights='pop_ave',
                 random_state = seed)
         self.sample_idx = np.array(self.pop_mean_sample.index.values)
+        # ensuring that we get some values with zero population
+        self.df_zero_sample = self.df_sample[self.df_sample['pop_ave']==0]
+        self.pop_mean_sample_zero = self.df_zero_sample.sample(
+                frac = self.sample_rate,
+                replace = True,
+                random_state = seed)
+        self.sample_idx_zero = np.array(self.pop_mean_sample_zero.index.values)
+        # combining with >0 sample
+        self.sample_idx = np.concatenate([self.sample_idx, 
+                                          self.sample_idx_zero])
+        self.pop_output_data = np.concatenate([self.pop_mean_sample, 
+                                               self.pop_mean_sample_zero]).T[0]
+        # shuffling so that we don't have the zero pop areas at end of sample
+        p = np.random.permutation(len(self.sample_idx))
+        self.sample_idx = self.sample_idx[p]
+        self.pop_output_data = self.pop_output_data[p]
     
     def sample_generator_sat(self):
         """
@@ -395,22 +412,6 @@ class database_constructor:
         print image_array.shape
         image_array = np.swapaxes(image_array, 0, 1)
         self.image_output_data = np.array(image_array)
-    
-    def sample_generator_pop(self):
-        """
-        
-        Constructs a sample of observations that Keras can play with 
-        We take the mean population density of each image 
-        
-        """
-        # getting population data
-        pop_output_data = []
-        self.sample_extractor(self.pop_array, axis=0)
-        for i in range(0, len(self.sample_idx)):
-            # We take the mean pop density
-            obs_pop = np.mean(self.image_sample[i])
-            pop_output_data.append(obs_pop)
-        self.pop_output_data = np.nan_to_num(np.array(pop_output_data))
 
     def save_files_X(self):
         """

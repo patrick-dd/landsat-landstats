@@ -8,9 +8,9 @@ from data_cleaning import *
 ## Note the file naming
 ## Number _53_ for Washington
 ## Number _41_ for Oregon
-census_shapefile = 'tabblock2010_41_pophu.shp'
-state_name = 'Oregon'
-state_code = 'OR'
+census_shapefile = 'tabblock2010_53_pophu.shp'
+state_name = 'Washington'
+state_code = 'WA'
 year = '2010'
 
 channels = ['B1', 'B2' , 'B3', 'B4', 'B5', 'B6_VCID_2', 'B7']
