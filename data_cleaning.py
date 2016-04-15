@@ -270,12 +270,9 @@ class database_constructor:
             # getting data
             print 'Loading bandwidth', extension
             band = self.satellite_gdal.GetRasterBand(1)
-            band_array = band.ReadAsArray()
-            #band_series = parmap.starmap(
-            #        array_wrapper, 
-            #        zip(self.cols_grid, self.rows_grid), 
-            #        band_array, processes = self.processes)
+            band_array = band.ReadAsArray()[0:nrows, 0:ncols]
             data.append(band_array.flatten())
+        data = np.array(data)
         self.df_image = GeoDataFrame({'location': self.location_series})
         for count, extension in enumerate(self.channels):
             self.df_image[extension] = data[count]
