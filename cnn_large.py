@@ -1,6 +1,9 @@
 import matplotlib
 matplotlib.use('Agg')
+import os
+os.environ['THEANO_FLAGS'] = 'device=gpu0,floatX=float32,lib.cnmem=0.85'
 import numpy as np
+from scipy import stats
 import h5py
 import pickle
 import matplotlib.pyplot as plt
@@ -13,42 +16,36 @@ from keras import callbacks
 from keras.layers.advanced_activations import LeakyReLU
 from keras.optimizers import Adam, SGD
 import theano
-theano.config.gpu = 'gpu0'
-theano.config.floatX = 'float32'
-theano.config.cnmem = 0.75
 
 obs_size = 32 
 
 print 'Reading data'
 
-f = h5py.File('keras_data/db_Oregon_X_0.hdfc5', 'r')
+f = h5py.File('data/keras/oregon/db_Oregon_X_0.hdf5', 'r')
 X_train = np.array(f['data'])
 f.close()
-f = h5py.File('keras_data/db_Oregon_y_0.hdf5', 'r')
+f = h5py.File('data/keras/oregon/db_Oregon_y_0.hdf5', 'r')
 y_train = np.array(f['data'])
 f.close()
 
-for i in range(1,78):
-	f = h5py.File('keras_data/db_Oregon_X_%d.hdf5' % i, 'r')
+file_numbers = np.random.randint(100,700,200)
+
+for i in file_numbers:
+	f = h5py.File('data/keras/oregon/db_Oregon_X_%d.hdf5' % i, 'r')
 	X_train = np.vstack((X_train, np.array(f['data'])))
 	f.close()
-	f = h5py.File('keras_data/db_Oregon_y_%d.hdf5' % i, 'r')
+	f = h5py.File('data/keras/oregon/db_Oregon_y_%d.hdf5' % i, 'r')
 	y_train = np.hstack((y_train, f['data']))
 	f.close()
-
-
-
-
-
 
 # There some observations that are ocean cells have
 # have values of zero everywhere
 # I remove them here
-zeros = [ not a.any() for a in X_train[:,1,:,:]]
-X_train = X_train[np.where(zeros==False)]
-y_train = y_train[np.where(zeros==False)]
-
-
+non_zeros = [ a.any() for a in X_train[:,1,:,:]]
+X_train = X_train[non_zeros, :, :, :]
+y_train = y_train[non_zeros]
+X_train = X_train.astype('float32')
+y_train = y_train.astype('float32')
 # normalising the input data
 X_train_mean = np.mean(X_train, axis=0)
 X_train_std = np.mean(X_train, axis=0)
@@ -67,9 +64,9 @@ inv_weight, bin_val = np.histogram(y_train)
 clamp_idx = len(inv_weight) - 1
 weight_idx = [min(np.searchsorted(bin_val, v, side='left'), clamp_idx) \
         for v in y_train]
-sample_weights = 1.0 / weight_idx
+sample_weights = 1.0 / inv_weight[weight_idx]
 
-def create_model()
+def create_model():
     print 'Creating the model'
     model = Sequential()
     # layer one
@@ -118,8 +115,9 @@ def create_model()
     model.add(Activation('linear'))
     return model
 
-def train_model(model = None, 
-        no_epochs, weights_path=None, learning_rate = 1e-2):
+def train_model(model, 
+        no_epochs = 10, weights_path=None, learning_rate = 1e-2):
+    print 'Constructing model'
     if model == None:
         model = create_model()
     if weights_path:
@@ -157,35 +155,35 @@ def train_model(model = None,
 
 def evaluate_model(model):
     # making space for some new data
-    del X_train
-    del y_train
+    #del X_train
+    #del y_train
     print 'Collecting new data'
-    f = h5py.File('keras_data/db_Washington_X_0.hdf5', 'r')
-    X_test = np.array(f['data'])
-    f.close()
-    f = h5py.File('keras_data/db_Washington_y_0.hdf5', 'r')
-    y_test = np.array(f['data'])
-    f.close()
+    #f = h5py.File('data/keras/oregon/db_Washington_X_0.hdf5', 'r')
+    #X_test = np.array(f['data'])
+    #f.close()
+    #f = h5py.File('data/keras/oregon/db_Washington_y_0.hdf5', 'r')
+    #y_test = np.array(f['data'])
+    #f.close()
 
-    for i in range(1,60):
-    	print i
-    	f = h5py.File('keras_data/db_Washington_X_%d.hdf5' % i, 'r')
-    	X_test = np.vstack((X_test, np.array(f['data'])))
-    	f.close()
-    	f = h5py.File('keras_data/db_Washington_y_%d.hdf5' % i, 'r')
-    	y_test = np.hstack((y_test, f['data']))
-    	f.close()
+    #for i in range(1,60):
+    #	print i
+    #	f = h5py.File('data/keras/oregon/db_Washington_X_%d.hdf5' % i, 'r')
+    #	X_test = np.vstack((X_test, np.array(f['data'])))
+    #	f.close()
+    #	f = h5py.File('data/keras/oregon/db_Washington_y_%d.hdf5' % i, 'r')
+    #	y_test = np.hstack((y_test, f['data']))
+    #	f.close()
 
     print 'Normalising data'
-    zeros = [not a.any() for a in X_test[:,1,:,:]]
-    X_test = X_test[np.where(zeros==False)]
-    y_test = y_test[np.where(zeros==False)]
-    X_test -= X_train_mean
-    X_test /= X_train_std
-    y_test -= y_mean
-    y_test /= y_std
+    #zeros = [not a.any() for a in X_test[:,1,:,:]]
+    #X_test = X_test[np.where(zeros==False)]
+    #y_test = y_test[np.where(zeros==False)]
+    #X_test -= X_train_mean
+    #X_test /= X_train_std
+    #y_test -= y_mean
+    #y_test /= y_std
     print 'Evaluating the model'
-    predicted = np.array(model.predict(X_test)).flatten()
+    predicted = np.array(model.predict(X_train)).flatten()
     print 'Predictions on training output'
     #
     slope, intercept, r_val, p_val, std_err = \
@@ -206,7 +204,7 @@ def evaluate_model(model):
         'X_std' : X_std}
     pickle.dump( output_data, open('output_data.p', 'wb') )
 
-def train_loop(no_epochs, model_weights = None, learning_rates):
+def train_loop(model, no_epochs, learning_rates, model_weights):
     """
     
     A loop to gradually lower the learning rate and improve the model
@@ -224,25 +222,26 @@ def train_loop(no_epochs, model_weights = None, learning_rates):
 
     """
     val_loss_history = []
-    for rate in learning_rates::
+    for rate in learning_rates:
         if model == None:
             model, hist_rate = train_model(
                     model = None,
                     no_epochs = no_epochs,
-                    model_weights = model_weights, 
+                    weights_path = model_weights, 
                     learning_rate = rate)
         else:
             model, hist_rate = train_model(
                     model = model,
                     no_epochs = no_epochs,
-                    model_weights = model_weights,
+                    weights_path = model_weights,
                     learning_rate = rate)
         val_loss_history.append(rate)
     pickle.dump( val_loss_history, open('loss_history.p', 'w') )
     evaluate_model(model)
     print 'Training complete, good job!'
 
-
-learning_rates = [1, 1e-1]
+ 
+learning_rates = [1, 1e-1, 1e-2, 1e-3, 1e-4]
 no_epochs = 50
-train_loop(no_epochs, model_weights = None, learning_rates):
+model, _ = train_model(None, no_epochs = no_epochs, learning_rate = 1)
+train_loop(model, no_epochs, learning_rates, 'model_weights.hdf5')
