@@ -182,7 +182,7 @@ class database_constructor:
         self.ncols = self.satellite_gdal.RasterXSize
         self.nrows = self.satellite_gdal.RasterYSize 
         print 'Columns, rows', self.ncols, self.nrows
-        rows_grid, cols_grid = np.meshgrid(
+        cols_grid, rows_grid = np.meshgrid(
                     range(0, self.ncols), 
                     range(0, self.nrows))
         self.cols_grid = cols_grid.flatten()
@@ -270,7 +270,7 @@ class database_constructor:
             # getting data
             print 'Loading bandwidth', extension
             band = self.satellite_gdal.GetRasterBand(1)
-            band_array = band.ReadAsArray()[0:nrows, 0:ncols]
+            band_array = band.ReadAsArray()
             data.append(band_array.flatten())
         data = np.array(data)
         self.df_image = GeoDataFrame({'location': self.location_series})
@@ -302,7 +302,7 @@ class database_constructor:
                         pyproj.transform,
                         # projection GSCNAD83
                         # southern WA EPSG:2286
-                        pyproj.Proj(init='EPSG:2286'), 
+                        pyproj.Proj(init='EPSG:4326'), 
                         pyproj.Proj(
                             proj='aea', 
                             lat1=region.bounds[1], 
@@ -310,7 +310,7 @@ class database_constructor:
                             )
                         ), 
                     region) 
-            area = geom_area.area / 1000000.0  #convert to km2
+            area = geom_area.area / 1000000.0  #convert m2 to km2
             area_sq_km.append( area )
         self.df_census['area'] = area_sq_km
         self.df_census['density'] = \
@@ -334,6 +334,7 @@ class database_constructor:
         self.df_image['pop_density'] = pixel_point['pop']
         self.df_image['latitude_u'] = pixel_point['latitude']
         self.df_image['longitude_u'] = pixel_point['longitude']
+        del pixel_point
     
     def sampling(self):
         """
@@ -368,7 +369,7 @@ class database_constructor:
         # Getting the locations
         self.df_sample['location'] = self.frame_location_series
         # Creating sample weights 
-        seed = 1996
+        seed  =1975
         self.pop_mean_sample = self.df_sample.sample(
                 frac=self.sample_rate,
                 replace=True,
