@@ -150,7 +150,7 @@ class database_constructor:
             idx.insert(count, block.bounds)
         return idx
 
-    def point_within_polygon(self, idx, points, polygons, pop):
+    def point_within_polygon(self, points, idx, polygons, pop):
         """
         Finds the census tract containing pixels
         Inputs:
@@ -179,14 +179,18 @@ class database_constructor:
         Extracts the location of each pixel in the satellite image
 
         """
-        self.ncols = self.satellite_gdal.RasterXSize
-        self.nrows = self.satellite_gdal.RasterYSize 
+        self.ncols = self.satellite_gdal.RasterXSize / 2
+        self.nrows = self.satellite_gdal.RasterYSize / 2
+        self.length_df = self.nrows * self.ncols
         print 'Columns, rows', self.ncols, self.nrows
         cols_grid, rows_grid = np.meshgrid(
                     range(0, self.ncols), 
                     range(0, self.nrows))
         self.cols_grid = cols_grid.flatten()
         self.rows_grid = rows_grid.flatten()
+        print 'Checking the meshgrid procedure works'
+        print 'Maximum number in cols_grid: ', max(self.cols_grid)
+        print 'Maximum number in rows_grid: ', max(self.rows_grid)
         # getting a series of lat lon points for each pixel
         self.geotransform = self.satellite_gdal.GetGeoTransform()
         print 'Getting locations'
@@ -195,11 +199,14 @@ class database_constructor:
                         zip(self.cols_grid, self.rows_grid), 
                         self.geotransform,
                         processes = self.processes))
+        print 'Head of location series: ', self.location_series[0:5]
         print 'Converting to Points'
         pool = Pool(self.processes)
         self.location_series = pool.map(
                         point_wrapper, 
                         self.location_series)
+        print 'Head of location series: ', self.location_series[0].x
+        print 'Head of location series: ', self.location_series[0].y
 
 
     def image_slicer(self, image):
@@ -270,7 +277,7 @@ class database_constructor:
             # getting data
             print 'Loading bandwidth', extension
             band = self.satellite_gdal.GetRasterBand(1)
-            band_array = band.ReadAsArray()
+            band_array = band.ReadAsArray()[0:self.nrows, 0:self.ncols]
             data.append(band_array.flatten())
         data = np.array(data)
         self.df_image = GeoDataFrame({'location': self.location_series})
@@ -328,13 +335,12 @@ class database_constructor:
         self.census_pop = np.array(self.df_census['density'])
         self.idx = self.spatialIndex(self.census_blocks)
         pixel_point = self.point_within_polygon(
-                self.idx, self.location_series, self.census_blocks,
+                self.location_series, self.idx, self.census_blocks,
                 self.census_pop)
         pixel_point.columns = ['poly', 'pop', 'latitude', 'longitude']
         self.df_image['pop_density'] = pixel_point['pop']
-        self.df_image['latitude_u'] = pixel_point['latitude']
-        self.df_image['longitude_u'] = pixel_point['longitude']
         del pixel_point
+        self.df_image.to_csv('after_join.csv')
     
     def sampling(self):
         """
@@ -357,6 +363,8 @@ class database_constructor:
         pool = Pool(self.processes)
         cols_grid = pool.map(adder, self.indices[:,0])
         rows_grid = pool.map(adder, self.indices[:,1])
+        print 'Max of cols grid after slicing:',  max(cols_grid)
+        print 'Max of rows grid after slicing:',  max(rows_grid)
         self.frame_location_series = parmap.starmap(
                 pixel_to_coordinates,
                 zip(cols_grid, rows_grid), self.geotransform, 
@@ -391,7 +399,10 @@ class database_constructor:
         # shuffling so that we don't have the zero pop areas at end of sample
         p = np.random.permutation(len(self.sample_idx))
         self.sample_idx = self.sample_idx[p]
-        self.pop_output_data = self.pop_output_data[p]
+        self.pop_output_data = np.array(
+                self.pop_output_data[p]).reshape((len(self.pop_output_data),1))
+        print 'Pop shape: ', self.pop_output_data.shape
+        print type(self.pop_output_data)
     
     def sample_generator_sat(self):
         """
@@ -411,7 +422,7 @@ class database_constructor:
         image_array = np.swapaxes(image_array, 0, 1)
         self.image_output_data = np.array(image_array)
 
-    def save_files_X(self):
+    def save_files(self):
         """
         Saves the image information
         Inputs:
@@ -423,20 +434,28 @@ class database_constructor:
         Nothing, it just saves the data! 
         """
         no_files = 1 + self.image_output_data.shape[0] / self.file_size 
+        print 'Number of files: ', no_files
+        print 'Image output shape: ', self.image_output_data.shape
+        print ' file_size: ', self.file_size
         # the count is for a non 'full' file of the size self.file_size
         count = 0
         print 'Number of files', no_files
         for i in range(0, no_files):
             # file size changes for X and y
-            temp = self.image_output_data[0:self.file_size, :, :, :]
+            temp_sat = self.image_output_data[0:self.file_size, :, :, :]
+            temp_pop = self.pop_output_data[0:self.file_size].tolist()
             f = h5py.File(
                     self.save_folder_loc + 'db_' + self.state_name + \
-                            '_X_%d.hdf5' % count, 'w')
-            f.create_dataset('data', data = temp, compression="gzip")
+                            '_%d.hdf5' % count, 'w')
+            f.create_dataset('features', 
+                    data = temp_sat, compression="gzip")
+            f.create_dataset('targets',
+                    data = temp_pop, compression="gzip")
             f.close()
             if self.file_size!=(self.image_output_data.shape[0]-1):
                 self.image_output_data = \
                         self.image_output_data[self.file_size:, :, :, :]
+                self.pop_output_data = self.pop_output_data[self.file_size:,:]
             count += 1
 
     def save_files_y(self):
@@ -447,16 +466,20 @@ class database_constructor:
         """
         no_files = 1 + self.pop_output_data.shape[0] / self.file_size 
         count = 0
-        print 'Number of files', no_files
-        for i in range(0, no_files):
-            # file size changes for X and y
-            temp = self.pop_output_data[0:self.file_size]
-            f = h5py.File(
-                    self.save_folder_loc + 'db_' + self.state_name + \
-                            '_y_%d.hdf5'% count, 'w')
-            f.create_dataset('data', data = temp, compression="gzip")
-            f.close()
-            if self.file_size!=(self.pop_output_data.shape[0]-1):
-                self.pop_output_data = self.pop_output_data[self.file_size:]
-            count += 1
+        print 'Number of files: ', no_files
+        print 'Image output shape: ', self.pop_output_data.shape
+        print ' file_size: ', self.file_size
+        #for i in range(0, no_files):
+        #    # file size changes for X and y
+        #    temp = self.pop_output_data[0:self.file_size]
+        f = h5py.File(
+                self.save_folder_loc + 'db_' + self.state_name + \
+                            '_y.hdf5', 'w')
+        f.create_dataset('data',
+                data = self.pop_output_data, 
+                compression="gzip")
+        f.close()
+        #    if self.file_size!=(self.pop_output_data.shape[0]-1):
+        #        self.pop_output_data = self.pop_output_data[self.file_size:]
+        #    count += 1
 
