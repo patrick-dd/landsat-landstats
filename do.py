@@ -8,9 +8,9 @@ from data_cleaning import *
 ## Note the file naming
 ## Number _53_ for Washington
 ## Number _41_ for Oregon
-census_shapefile = 'tabblock2010_41_pophu.shp'
-state_name = 'Oregon'
-state_code = 'OR'
+census_shapefile = 'tabblock2010_53_pophu.shp'
+state_name = 'Washington'
+state_code = 'WA'
 year = '2010'
 
 channels = ['B1', 'B2', 'B3', 'B4', 'B5', 'B6_VCID_2', 'B7']
@@ -19,11 +19,11 @@ census_folder_loc = 'data/census/'
 save_folder_loc = 'data/keras/'
 
 # a file size of 10 ~ 1mb
-file_size = 2**16				# number of observations in each file
+file_size = 2**17				# number of observations in each file
 sample_rate = 0.4				# number of total images sampled
 obs_size = 32					# size of image
-processes = 16                  # number of CPU cores
-step = 8                       # size of step in image creation
+processes = 40              # number of CPU cores
+step = 8                    # size of step in image creation
 
 if __name__ == "__main__":
     print 'Starting database construction'

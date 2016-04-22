@@ -26,10 +26,10 @@ X_train = np.array(f['features'])
 y_train = np.array(f['targets'])
 f.close()
 
-#f = h5py.File('data/keras/db_Oregon_1.hdf5', 'r')
-#X_train = np.vstack((X_train, np.array(f['features'])))
-#y_train = np.vstack((y_train, np.array(f['targets'])))
-#f.close()
+f = h5py.File('data/keras/db_Oregon_1.hdf5', 'r')
+X_train = np.vstack((X_train, np.array(f['features'])))
+y_train = np.vstack((y_train, np.array(f['targets'])))
+f.close()
 
 # There some observations that are ocean cells have
 # have values of zero everywhere
@@ -43,8 +43,8 @@ pop_pos = [True if i > 0 else False for i in y_train]
 X_train = X_train[np.where(pop_pos)]
 y_train = y_train[np.where(pop_pos)]
 
-X_train = X_train[0:1000]
-y_train = y_train[0:1000]
+X_train = X_train
+y_train = y_train
 
 # normalising the input data
 X_train = X_train.astype('float32')
@@ -143,8 +143,8 @@ def evaluate_model(model):
     y_test = y_test[np.where(pop_pos)]
 
     # small sample for toying
-    X_test = X_test[0:1000]
-    y_test = y_test[0:1000]
+    X_test = X_test
+    y_test = y_test
 
     # normalising the input data
     X_test = X_test.astype('float32')
@@ -230,7 +230,7 @@ def train_loop(no_epochs, learning_rates, weights_path='model_weights.hdf5'):
         mode='auto')
     earlystop = callbacks.EarlyStopping(
         monitor='val_loss', 
-        patience = 5, 
+        patience = 10, 
         verbose=1, 
         mode='min')
     history = callbacks.History()
@@ -266,7 +266,7 @@ def train_loop(no_epochs, learning_rates, weights_path='model_weights.hdf5'):
     return model
  
 learning_rates = [1, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5]
-no_epochs = 5
+no_epochs = 50
 model = train_loop(no_epochs, learning_rates)
 evaluate_model(model)
 #print 'Good one. Next?'
