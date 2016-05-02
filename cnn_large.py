@@ -39,12 +39,9 @@ X_train = X_train[np.where(non_zeros)]
 y_train = y_train[np.where(non_zeros)]
 
 # test only do positive
-pop_pos = [True if i > 0 else False for i in y_train]
-X_train = X_train[np.where(pop_pos)]
-y_train = y_train[np.where(pop_pos)]
-
-X_train = X_train
-y_train = y_train
+#pop_pos = [True if i > 0 else False for i in y_train]
+#X_train = X_train[np.where(pop_pos)]
+#y_train = y_train[np.where(pop_pos)]
 
 # normalising the input data
 X_train = X_train.astype('float32')
@@ -82,35 +79,51 @@ def create_model():
                         init='he_uniform'))
     model.add(Activation('relu'))
     model.add(MaxPooling2D(pool_size=(2, 2), strides=(2,2)))
-    model.add(Dropout(0.25))
     # layer two
-    # model.add(Convolution2D(128, 3, 3,
-    #                    border_mode='same',
-    #                    init='he_uniform'))
-    #model.add(Activation('relu'))
-    #model.add(Convolution2D(128, 3, 3, 
-    #			border_mode='same',
-    #                    init='he_uniform'))
-    #model.add(Activation('relu'))
-    #model.add(MaxPooling2D(pool_size=(2, 2), strides=(2,2)))
-    #model.add(Dropout(0.25))
+    model.add(Convolution2D(128, 3, 3,
+                        border_mode='same',
+                        init='he_uniform'))
+    model.add(Activation('relu'))
+    model.add(Convolution2D(128, 3, 3, 
+    			border_mode='same',
+                        init='he_uniform'))
+    model.add(Activation('relu'))
+    model.add(MaxPooling2D(pool_size=(2, 2), strides=(2,2)))
     # layer three
-    #model.add(Convolution2D(256, 3, 3,
-    #                    border_mode='same',
-    #                    init='he_uniform'))
-    #model.add(Activation('relu'))
-    #model.add(Convolution2D(256, 3, 3, 
-    #			border_mode='same',
-    #                    init='he_uniform'))
-    #model.add(Activation('relu'))
-    #model.add(MaxPooling2D(pool_size=(2, 2), strides=(2,2)))
-    #model.add(Dropout(0.25))
+    model.add(Convolution2D(256, 3, 3,
+                        border_mode='same',
+                        init='he_uniform'))
+    model.add(Activation('relu'))
+    model.add(Convolution2D(256, 3, 3, 
+    			border_mode='same',
+                        init='he_uniform'))
+    model.add(Activation('relu'))
+    model.add(Convolution2D(256, 3, 3, 
+    			border_mode='same',
+                        init='he_uniform'))
+    model.add(Activation('relu'))
+    model.add(MaxPooling2D(pool_size=(2, 2), strides=(2,2)))
+    # layer four
+    model.add(Convolution2D(512, 3, 3,
+                        border_mode='same',
+                        init='he_uniform'))
+    model.add(Activation('relu'))
+    model.add(Convolution2D(512, 3, 3, 
+    			border_mode='same',
+                        init='he_uniform'))
+    model.add(Activation('relu'))
+    model.add(Convolution2D(512, 3, 3, 
+    			border_mode='same',
+                        init='he_uniform'))
+    model.add(Activation('relu'))
+    model.add(MaxPooling2D(pool_size=(2, 2), strides=(2,2)))
     # fuller connected layers
     model.add(Flatten())
     model.add(Dense(4096, init='he_uniform'))
     model.add(Activation('relu'))
-    #model.add(Dense(4096, init='he_uniform'))
-    #model.add(Activation('relu'))
+    model.add(Dropout(0.5))
+    model.add(Dense(4096, init='he_uniform'))
+    model.add(Activation('relu'))
     model.add(Dropout(0.5))
     # regression layer
     model.add(Dense(1, init='glorot_uniform'))
@@ -126,10 +139,10 @@ def evaluate_model(model):
     y_test = np.array(f['targets'])
     f.close()
 
-    #f = h5py.File('data/keras/db_Washington_1.hdf5', 'r')
-    #X_test = np.vstack((X_test, np.array(f['features'])))
-    #y_test = np.vstack((y_test, np.array(f['targets'])))
-    #f.close()
+    f = h5py.File('data/keras/db_Washington_1.hdf5', 'r')
+    X_test = np.vstack((X_test, np.array(f['features'])))
+    y_test = np.vstack((y_test, np.array(f['targets'])))
+    f.close()
 
     # There some observations that are ocean cells have
     # have values of zero everywhere
@@ -138,13 +151,13 @@ def evaluate_model(model):
     X_test = X_test[np.where(non_zeros)]
     y_test = y_test[np.where(non_zeros)]
     # test only do positive
-    pop_pos = [True if i > 0 else False for i in y_test]
-    X_test = X_test[np.where(pop_pos)]
-    y_test = y_test[np.where(pop_pos)]
+    #pop_pos = [True if i > 0 else False for i in y_test]
+    #X_test = X_test[np.where(pop_pos)]
+    #y_test = y_test[np.where(pop_pos)]
 
     # small sample for toying
-    X_test = X_test
-    y_test = y_test
+    #X_test = X_test
+    #y_test = y_test
 
     # normalising the input data
     X_test = X_test.astype('float32')
@@ -193,13 +206,15 @@ def evaluate_model(model):
     output_data = {
         'Test_predictions' : predicted,
         'y_test_normalised' : y_test,
+        'in_predictions' : predicted_in,
+        'y_train_normalised' : y_train,
         'y_mean' : y_mean,
         'y_std' : y_std,
         'X_mean' : X_mean,
         'X_std' : X_std}
     pickle.dump( output_data, open('output_data.p', 'wb') )
 
-def train_loop(no_epochs, learning_rates, weights_path='model_weights.hdf5'):
+def train_loop(no_epochs, learning_rates, model_weights=None):
     """
     
     A loop to gradually lower the learning rate and improve the model
@@ -217,6 +232,8 @@ def train_loop(no_epochs, learning_rates, weights_path='model_weights.hdf5'):
 
     """
     model = create_model()
+    if model_weights:
+        model.load_weights(model_weights)
     ## compile model
     adam = Adam(lr = 1, 
             beta_1 = 0.9, beta_2 = 0.999, epsilon = 1e-8)
@@ -230,7 +247,7 @@ def train_loop(no_epochs, learning_rates, weights_path='model_weights.hdf5'):
         mode='auto')
     earlystop = callbacks.EarlyStopping(
         monitor='val_loss', 
-        patience = 10, 
+        patience = 5, 
         verbose=1, 
         mode='min')
     history = callbacks.History()
@@ -267,6 +284,6 @@ def train_loop(no_epochs, learning_rates, weights_path='model_weights.hdf5'):
  
 learning_rates = [1, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5]
 no_epochs = 50
-model = train_loop(no_epochs, learning_rates)
+model = train_loop(no_epochs, learning_rates,model_weights='weights.hdf5')
 evaluate_model(model)
-#print 'Good one. Next?'
+print 'Good one. Next?'
