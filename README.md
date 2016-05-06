@@ -9,7 +9,7 @@ modify this code to predict other socio-economic characteristics or use
 other satellite images. In addition to the convnet, I've provide files to
 construct the data.
 
-The model works pretty well. The current version results in a test R<sup>2</sup> of 0.45. Version 1.0 resulted in a test set R<sup>2</sup> of 0.26. The main difference is the improvement in satellite image resolution from 1000 meters per pixel to 180 meters per pixel. 
+The model works pretty well. The current version results in a test R<sup>2</sup> of 0.74. Version 1.0 resulted in a test set R<sup>2</sup> of 0.26. The main difference is the improvement in satellite image resolution from 1000 meters per pixel to 180 meters per pixel. 
 
 I ran the convnet on [AWS](http://aws.amazon.com)'s G2 machine and constructed
 the database on AWS's M10 machine. [Get in
